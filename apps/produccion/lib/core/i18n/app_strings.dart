@@ -62,6 +62,7 @@ abstract final class AppStrings {
   static const String queuePieces = 'piezas';
   static const String queueMissing = 'Faltan';
   static const String queueEstimated = 'min';
+  static const String queueDelivery = 'Entrega';
   static const String queueStatePending = 'Pendiente';
   static const String queueStateQueued = 'En cola';
   static const String queueStatePrinted = 'Impreso';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:novalab_api/novalab_api.dart';
 
+import '../../../core/i18n/app_formatters.dart';
 import '../../../core/i18n/app_strings.dart';
 import '../../../core/theme/design_tokens.dart';
 
@@ -91,9 +92,33 @@ class QueueItemCard extends StatelessWidget {
                     color: scheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: DesignTokens.spaceXs),
-                  Text(
-                    '~${item.estimatedMinutes} ${AppStrings.queueEstimated}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                  Expanded(
+                    child: Text(
+                      '~${item.estimatedMinutes} ${AppStrings.queueEstimated}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (item.promisedDate != null) ...<Widget>[
+              const SizedBox(height: DesignTokens.spaceXs),
+              Row(
+                children: <Widget>[
+                  Icon(
+                    Icons.event_outlined,
+                    size: 14,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: DesignTokens.spaceXs),
+                  Expanded(
+                    child: Text(
+                      '${AppStrings.queueDelivery}: '
+                      '${AppFormatters.dateMedium(item.promisedDate)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
