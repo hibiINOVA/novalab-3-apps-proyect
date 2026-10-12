@@ -17,6 +17,8 @@ abstract final class AppStrings {
       'No se pudo iniciar sesión. Intenta de nuevo.';
   static const String loginTooManyAttempts =
       'Demasiados intentos. Espera un momento.';
+  static const String loginShowPassword = 'Mostrar contraseña';
+  static const String loginHidePassword = 'Ocultar contraseña';
   static const String logout = 'Cerrar sesión';
 
   // Navegación

@@ -1,19 +1,21 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novalab_api/novalab_api.dart';
 
 import '../../core/config/app_providers.dart';
 import '../../core/i18n/app_strings.dart';
+import 'auth_providers.dart';
 import 'auth_state.dart';
 
 /// Controla la sesión del operador/dueño (P-01).
 ///
 /// La lógica de credenciales vive en el backend; aquí solo se orquesta la
-/// llamada y se guarda el resultado. La persistencia se añade en la capa de
-/// almacenamiento de tokens.
+/// llamada, se guarda el resultado y se persiste la sesión en el dispositivo.
 class AuthController extends Notifier<AuthState> {
   @override
-  AuthState build() => const AuthState();
+  AuthState build() => ref.watch(initialAuthStateProvider);
 
   Future<bool> signIn({required String email, required String password}) async {
     state = state.copyWith(status: AuthStatus.authenticating, clearError: true);
@@ -37,12 +39,14 @@ class AuthController extends Notifier<AuthState> {
         );
         return false;
       }
-      state = AuthState(
+      final next = AuthState(
         status: AuthStatus.authenticated,
         user: data.user,
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
       );
+      state = next;
+      await _persist(next);
       return true;
     } on DioException catch (error) {
       state = state.copyWith(
@@ -55,6 +59,23 @@ class AuthController extends Notifier<AuthState> {
 
   void signOut() {
     state = const AuthState();
+    unawaited(_clearPersisted());
+  }
+
+  Future<void> _persist(AuthState session) async {
+    try {
+      await ref.read(authTokenStoreProvider).save(session);
+    } catch (_) {
+      // No romper la sesión si falla la persistencia.
+    }
+  }
+
+  Future<void> _clearPersisted() async {
+    try {
+      await ref.read(authTokenStoreProvider).clear();
+    } catch (_) {
+      // Ignorar fallos de almacenamiento al cerrar sesión.
+    }
   }
 
   String _messageFor(DioException error) {

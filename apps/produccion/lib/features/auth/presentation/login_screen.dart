@@ -30,23 +30,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
-    final ok = await ref
+    await ref
         .read(authControllerProvider.notifier)
         .signIn(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
-    if (!mounted || ok) return;
-    final message = ref.read(authControllerProvider).errorMessage;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message ?? AppStrings.loginGenericError)),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final status = ref.watch(
       authControllerProvider.select((state) => state.status),
+    );
+    final errorMessage = ref.watch(
+      authControllerProvider.select((state) => state.errorMessage),
     );
     final isSubmitting = status == AuthStatus.authenticating;
 
@@ -105,7 +103,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       labelText: AppStrings.loginPassword,
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        tooltip: _obscurePassword ? 'Mostrar' : 'Ocultar',
+                        tooltip: _obscurePassword
+                            ? AppStrings.loginShowPassword
+                            : AppStrings.loginHidePassword,
                         icon: Icon(
                           _obscurePassword
                               ? Icons.visibility_outlined
@@ -121,6 +121,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         : null,
                   ),
                   const SizedBox(height: DesignTokens.spaceLg),
+                  if (errorMessage != null) ...<Widget>[
+                    Text(
+                      errorMessage,
+                      key: const Key('login-error'),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    const SizedBox(height: DesignTokens.spaceMd),
+                  ],
                   FilledButton(
                     onPressed: isSubmitting ? null : _submit,
                     child: isSubmitting
