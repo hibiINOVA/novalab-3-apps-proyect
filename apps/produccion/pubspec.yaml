@@ -24,6 +24,9 @@ dependencies:
   intl: ^0.20.3
   # Contrato OpenAPI (anotación consumida por openapi_generator)
   openapi_generator_annotations: ^7.0.0
+  # Cliente Dart/dio generado desde packages/api-contract/openapi.yaml
+  novalab_api:
+    path: ../../packages/api_client
 
 dev_dependencies:
   flutter_test:
