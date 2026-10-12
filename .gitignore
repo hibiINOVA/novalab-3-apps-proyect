@@ -1,0 +1,49 @@
+# --- General ---
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# --- Flutter / Dart ---
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+coverage/
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Flutter generated (web/desktop ephemeral)
+apps/produccion/web/flutter_bootstrap.js
+apps/produccion/linux/flutter/ephemeral/
+apps/produccion/android/.gradle/
+apps/produccion/ios/Pods/
+apps/produccion/macos/Pods/
+apps/produccion/windows/flutter/ephemeral/
+
+# Generated API client (regenerable con build_runner)
+apps/produccion/lib/src/api/generated/
+
+# --- Python (backend futuro) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Node (apps cliente/finanzas futuro) ---
+node_modules/
+dist/
+.vite/
+
+# --- Datos y despliegue locales ---
+/data/
+*.sqlite
+*.sqlite3
+*.db
