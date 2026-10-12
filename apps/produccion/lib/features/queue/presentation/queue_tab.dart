@@ -7,16 +7,25 @@ import '../../../core/theme/design_tokens.dart';
 import '../../printers/printers_providers.dart';
 import '../queue_providers.dart';
 import 'queue_column.dart';
+import 'suggestion_dialog.dart';
 
 /// Cola de producción (P-03): columnas por impresora más "sin asignar".
 ///
 /// Los items se arrastran entre columnas y se reordenan; el backend confirma el
-/// cambio y la app revierte si hay conflicto de versión.
-class QueueTab extends ConsumerWidget {
+/// cambio y la app revierte si hay conflicto de versión. Incluye el botón de
+/// "Sugerir asignación" (P-04).
+class QueueTab extends ConsumerStatefulWidget {
   const QueueTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<QueueTab> createState() => _QueueTabState();
+}
+
+class _QueueTabState extends ConsumerState<QueueTab> {
+  bool _requesting = false;
+
+  @override
+  Widget build(BuildContext context) {
     final queue = ref.watch(queueProvider);
     final printers = ref.watch(printersProvider).value ?? const <Printer>[];
 
@@ -30,11 +39,28 @@ class QueueTab extends ConsumerWidget {
             DesignTokens.spaceMd,
             DesignTokens.spaceSm,
           ),
-          child: Text(
-            AppStrings.queueTitle,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  AppStrings.queueTitle,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: _requesting ? null : _handleSuggest,
+                icon: _requesting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.auto_awesome),
+                label: const Text(AppStrings.queueSuggest),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -43,8 +69,6 @@ class QueueTab extends ConsumerWidget {
               queue: value,
               printers: printers,
               onDrop: (itemId, printerId, position) => _handleDrop(
-                ref,
-                context,
                 itemId: itemId,
                 printerId: printerId,
                 position: position,
@@ -60,9 +84,7 @@ class QueueTab extends ConsumerWidget {
     );
   }
 
-  Future<void> _handleDrop(
-    WidgetRef ref,
-    BuildContext context, {
+  Future<void> _handleDrop({
     required int itemId,
     required int? printerId,
     required int position,
@@ -70,9 +92,40 @@ class QueueTab extends ConsumerWidget {
     final ok = await ref
         .read(queueProvider.notifier)
         .moveItem(itemId: itemId, printerId: printerId, position: position);
-    if (!ok && context.mounted) {
+    if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text(AppStrings.queueReorderError)),
+      );
+    }
+  }
+
+  Future<void> _handleSuggest() async {
+    setState(() => _requesting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final controller = ref.read(queueProvider.notifier);
+    try {
+      final suggestion = await controller.requestSuggestion();
+      if (!mounted) return;
+      setState(() => _requesting = false);
+
+      final accepted = await SuggestionDialog.show(context, suggestion);
+      if (accepted == null || !mounted) return;
+
+      final ok = await controller.acceptSuggestion(
+        suggestion,
+        itemIds: accepted,
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            ok ? AppStrings.suggestApplied : AppStrings.queueReorderError,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) setState(() => _requesting = false);
+      messenger.showSnackBar(
+        const SnackBar(content: Text(AppStrings.suggestError)),
       );
     }
   }

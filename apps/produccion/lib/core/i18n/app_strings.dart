@@ -68,6 +68,17 @@ abstract final class AppStrings {
   static const String queueStatePrinted = 'Impreso';
   static const String queueStateFailed = 'Falló';
 
+  // Sugerencia de asignación (P-04)
+  static const String queueSuggest = 'Sugerir asignación';
+  static const String suggestTitle = 'Propuesta de asignación';
+  static const String suggestAcceptAll = 'Aceptar todo';
+  static const String suggestAcceptSelected = 'Aceptar seleccionados';
+  static const String suggestDiscard = 'Descartar';
+  static const String suggestEmpty = 'No hay items pendientes por asignar.';
+  static const String suggestError = 'No se pudo generar la propuesta.';
+  static const String suggestApplied = 'Asignación aplicada.';
+  static const String suggestUnassigned = 'Sin asignar';
+
   // Generales
   static const String retry = 'Reintentar';
   static const String loading = 'Cargando…';

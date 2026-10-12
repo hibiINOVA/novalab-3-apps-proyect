@@ -92,6 +92,58 @@ class QueueController extends AsyncNotifier<Queue> {
       return false;
     }
   }
+
+  /// Pide al backend una propuesta de asignación (P-04).
+  Future<QueueSuggestion> requestSuggestion() async {
+    final response = await ref
+        .read(novalabApiProvider)
+        .getQueueApi()
+        .suggestQueueAssignment();
+    final suggestion = response.data;
+    if (suggestion == null) {
+      throw StateError('Respuesta de sugerencia vacía.');
+    }
+    return suggestion;
+  }
+
+  /// Acepta (todas o parte de) las asignaciones propuestas y devuelve `false`
+  /// si hubo conflicto de versión u otro error.
+  Future<bool> acceptSuggestion(
+    QueueSuggestion suggestion, {
+    Set<int>? itemIds,
+  }) async {
+    final selected = suggestion.assignments
+        .where((a) => itemIds == null || itemIds.contains(a.itemId))
+        .toList();
+    if (selected.isEmpty) return true;
+
+    try {
+      final response = await ref
+          .read(novalabApiProvider)
+          .getQueueApi()
+          .acceptQueueAssignment(
+            queueAcceptRequest: QueueAcceptRequest(
+              (b) => b
+                ..version = suggestion.version
+                ..assignments.addAll(
+                  selected.map(
+                    (a) => QueueAcceptEntry(
+                      (e) => e
+                        ..itemId = a.itemId
+                        ..printerId = a.printerId,
+                    ),
+                  ),
+                ),
+            ),
+          );
+      final queue = response.data;
+      if (queue != null) state = AsyncData(queue);
+      return true;
+    } on DioException {
+      await refresh();
+      return false;
+    }
+  }
 }
 
 /// Aplana la cola como lista de entradas de reordenamiento.
