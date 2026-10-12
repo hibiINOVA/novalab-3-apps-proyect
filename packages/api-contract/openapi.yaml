@@ -1,0 +1,462 @@
+# NOVALAB — Contrato de API (stub temporal)
+#
+# ⚠️ TEMPORAL: este archivo es un SUBCONJUNTO mínimo escrito a mano para permitir
+# el desarrollo contract-first de `apps/produccion` (P-01..P-03).
+# Fuente de verdad definitiva: el OpenAPI GENERADO por el backend FastAPI
+# (doc §3.1, §7). Cuando exista el backend, reemplazar este archivo por su
+# `openapi.json`/`openapi.yaml` y regenerar el cliente Dart. No agregar aquí
+# lógica de negocio ni endpoints fuera del alcance de la entrega.
+openapi: 3.0.3
+info:
+  title: NOVALAB API
+  description: >-
+    Contrato compartido por las 3 aplicaciones. Esta es una versión parcial
+    (auth, branding, impresoras y cola) usada mientras el backend no existe.
+  version: 0.1.0
+servers:
+  - url: /
+    description: Mismo origen (el backend se sirve detrás de Caddy en el puerto privado)
+
+tags:
+  - name: auth
+  - name: public
+  - name: printers
+  - name: queue
+
+paths:
+  /api/auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Inicia sesión y devuelve tokens JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshToken
+      summary: Renueva el access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Token renovado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/public/branding:
+    get:
+      tags: [public]
+      operationId: getBranding
+      summary: Marca y configuración visible del negocio
+      security: []
+      responses:
+        '200':
+          description: Branding del negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branding'
+
+  /api/printers:
+    get:
+      tags: [printers]
+      operationId: listPrinters
+      summary: Lista las impresoras con su estado en vivo
+      responses:
+        '200':
+          description: Impresoras
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Printer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/queue:
+    get:
+      tags: [queue]
+      operationId: getQueue
+      summary: Cola de producción (items sin asignar y por impresora)
+      responses:
+        '200':
+          description: Cola completa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Queue'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/queue/reorder:
+    patch:
+      tags: [queue]
+      operationId: reorderQueue
+      summary: Mueve y reordena items entre impresoras y la cola sin asignar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueueReorderRequest'
+      responses:
+        '200':
+          description: Cola actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Queue'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Conflicto de versión de la cola; recargar
+
+# Canal de tiempo real (WebSocket). OpenAPI no describe WebSocket de forma nativa;
+# se documenta mediante extensión para los generadores de clientes.
+x-websocket:
+  path: /ws
+  description: >-
+    Eventos en tiempo real (estado de impresoras, cola y pedidos). Cada mensaje
+    es un objeto StatusEvent serializado como JSON.
+  message:
+    $ref: '#/components/schemas/StatusEvent'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: No autenticado o token inválido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: Demasiados intentos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    Role:
+      type: string
+      enum: [owner, operator]
+
+    User:
+      type: object
+      required: [id, name, email, role]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/Role'
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    LoginResponse:
+      type: object
+      required: [access_token, refresh_token, token_type, user]
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          default: bearer
+        user:
+          $ref: '#/components/schemas/User'
+
+    Branding:
+      type: object
+      required: [business_name, primary_color, accent_color, background_color, currency, timezone, language]
+      properties:
+        business_name:
+          type: string
+        logo_url:
+          type: string
+          nullable: true
+        primary_color:
+          type: string
+          description: Color hex, p. ej. #0B132B
+        accent_color:
+          type: string
+          description: Color hex, p. ej. #00FF87
+        background_color:
+          type: string
+        currency:
+          type: string
+          description: Código ISO 4217, p. ej. MXN
+        timezone:
+          type: string
+          description: Zona IANA, p. ej. America/Mexico_City
+        language:
+          type: string
+          description: Etiqueta BCP-47, p. ej. es-MX
+
+    PrinterState:
+      type: string
+      enum: [idle, printing, paused, offline, error]
+
+    SpoolRef:
+      type: object
+      required: [id, material, color]
+      properties:
+        id:
+          type: integer
+          format: int64
+        material:
+          type: string
+        color:
+          type: string
+        grams_remaining:
+          type: number
+          format: float
+          nullable: true
+
+    OrderRef:
+      type: object
+      required: [id, folio, customer_name]
+      properties:
+        id:
+          type: integer
+          format: int64
+        folio:
+          type: string
+        customer_name:
+          type: string
+        promised_date:
+          type: string
+          format: date
+          nullable: true
+
+    Printer:
+      type: object
+      required: [id, name, state]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        state:
+          $ref: '#/components/schemas/PrinterState'
+        progress:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          nullable: true
+        remaining_seconds:
+          type: integer
+          nullable: true
+        nozzle_temp:
+          type: number
+          format: float
+          nullable: true
+        nozzle_target:
+          type: number
+          format: float
+          nullable: true
+        bed_temp:
+          type: number
+          format: float
+          nullable: true
+        bed_target:
+          type: number
+          format: float
+          nullable: true
+        current_file:
+          type: string
+          nullable: true
+        camera_available:
+          type: boolean
+          default: false
+        loaded_spool:
+          allOf:
+            - $ref: '#/components/schemas/SpoolRef'
+          nullable: true
+        current_order:
+          allOf:
+            - $ref: '#/components/schemas/OrderRef'
+          nullable: true
+        last_seen:
+          type: string
+          format: date-time
+          nullable: true
+
+    QueueItemState:
+      type: string
+      enum: [pending, queued, printing, printed, failed]
+
+    QueueItem:
+      type: object
+      required: [id, order_id, order_folio, product_name, quantity, printed_quantity, state]
+      properties:
+        id:
+          type: integer
+          format: int64
+        order_id:
+          type: integer
+          format: int64
+        order_folio:
+          type: string
+        product_name:
+          type: string
+        color:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+        printed_quantity:
+          type: integer
+        missing_quantity:
+          type: integer
+        state:
+          $ref: '#/components/schemas/QueueItemState'
+        printer_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: null = sin asignar
+        position:
+          type: integer
+          description: Orden dentro de la columna
+        estimated_minutes:
+          type: integer
+          nullable: true
+        promised_date:
+          type: string
+          format: date
+          nullable: true
+
+    Queue:
+      type: object
+      required: [unassigned, by_printer, version]
+      properties:
+        unassigned:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueueItem'
+        by_printer:
+          type: object
+          description: Mapa printer_id (string) -> items asignados
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/QueueItem'
+        version:
+          type: integer
+          description: Versión para control de concurrencia optimista
+
+    QueueReorderEntry:
+      type: object
+      required: [id, position]
+      properties:
+        id:
+          type: integer
+          format: int64
+        printer_id:
+          type: integer
+          format: int64
+          nullable: true
+        position:
+          type: integer
+
+    QueueReorderRequest:
+      type: object
+      required: [version, items]
+      properties:
+        version:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueueReorderEntry'
+
+    StatusEvent:
+      type: object
+      required: [type, entity, entity_id, occurred_at]
+      properties:
+        type:
+          type: string
+          description: Tipo de evento, p. ej. printer.state, queue.updated, order.updated
+        entity:
+          type: string
+        entity_id:
+          type: integer
+          format: int64
+          nullable: true
+        payload:
+          type: object
+          additionalProperties: true
+        occurred_at:
+          type: string
+          format: date-time
+
+security:
+  - bearerAuth: []
