@@ -10,7 +10,11 @@ import 'package:novalab_api/src/auth/basic_auth.dart';
 import 'package:novalab_api/src/auth/bearer_auth.dart';
 import 'package:novalab_api/src/auth/oauth.dart';
 import 'package:novalab_api/src/api/auth_api.dart';
+import 'package:novalab_api/src/api/customers_api.dart';
+import 'package:novalab_api/src/api/orders_api.dart';
+import 'package:novalab_api/src/api/print_jobs_api.dart';
 import 'package:novalab_api/src/api/printers_api.dart';
+import 'package:novalab_api/src/api/products_api.dart';
 import 'package:novalab_api/src/api/public_api.dart';
 import 'package:novalab_api/src/api/queue_api.dart';
 
@@ -85,10 +89,34 @@ class NovalabApi {
     return AuthApi(dio, serializers);
   }
 
+  /// Get CustomersApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  CustomersApi getCustomersApi() {
+    return CustomersApi(dio, serializers);
+  }
+
+  /// Get OrdersApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  OrdersApi getOrdersApi() {
+    return OrdersApi(dio, serializers);
+  }
+
+  /// Get PrintJobsApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  PrintJobsApi getPrintJobsApi() {
+    return PrintJobsApi(dio, serializers);
+  }
+
   /// Get PrintersApi instance, base route and serializer can be overridden by a given but be careful,
   /// by doing that all interceptors will not be executed
   PrintersApi getPrintersApi() {
     return PrintersApi(dio, serializers);
+  }
+
+  /// Get ProductsApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  ProductsApi getProductsApi() {
+    return ProductsApi(dio, serializers);
   }
 
   /// Get PublicApi instance, base route and serializer can be overridden by a given but be careful,

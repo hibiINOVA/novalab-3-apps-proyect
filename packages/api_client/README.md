@@ -67,31 +67,63 @@ Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
 [*AuthApi*](doc/AuthApi.md) | [**login**](doc/AuthApi.md#login) | **POST** /api/auth/login | Inicia sesión y devuelve tokens JWT
 [*AuthApi*](doc/AuthApi.md) | [**refreshToken**](doc/AuthApi.md#refreshtoken) | **POST** /api/auth/refresh | Renueva el access token
+[*CustomersApi*](doc/CustomersApi.md) | [**listCustomers**](doc/CustomersApi.md#listcustomers) | **GET** /api/customers | Lista de clientes (para nuevo pedido)
+[*OrdersApi*](doc/OrdersApi.md) | [**createOrder**](doc/OrdersApi.md#createorder) | **POST** /api/orders | Crea un pedido nuevo (P-09)
+[*OrdersApi*](doc/OrdersApi.md) | [**getOrder**](doc/OrdersApi.md#getorder) | **GET** /api/orders/{orderId} | Detalle de pedido (items, faltantes, historial, envío)
+[*OrdersApi*](doc/OrdersApi.md) | [**listOrders**](doc/OrdersApi.md#listorders) | **GET** /api/orders | Lista pedidos con filtros y búsqueda por folio/cliente
+[*OrdersApi*](doc/OrdersApi.md) | [**updateOrderStatus**](doc/OrdersApi.md#updateorderstatus) | **PATCH** /api/orders/{orderId}/status | Cambio manual de estado (Empacado, Enviado, Entregado, Cancelado)
+[*PrintJobsApi*](doc/PrintJobsApi.md) | [**completePrintJob**](doc/PrintJobsApi.md#completeprintjob) | **POST** /api/print-jobs/{jobId}/complete | Marca un job como terminado
+[*PrintJobsApi*](doc/PrintJobsApi.md) | [**failPrintJob**](doc/PrintJobsApi.md#failprintjob) | **POST** /api/print-jobs/{jobId}/fail | Marca un job como fallido y registra el motivo
+[*PrintJobsApi*](doc/PrintJobsApi.md) | [**reprintJob**](doc/PrintJobsApi.md#reprintjob) | **POST** /api/print-jobs/{jobId}/reprint | Crea un nuevo job para reimprimir un item fallido
+[*PrintJobsApi*](doc/PrintJobsApi.md) | [**startPrintJob**](doc/PrintJobsApi.md#startprintjob) | **POST** /api/print-jobs | Confirma e inicia la impresión de un item (BE-05)
 [*PrintersApi*](doc/PrintersApi.md) | [**getPrinterCameraSnapshot**](doc/PrintersApi.md#getprintercamerasnapshot) | **GET** /api/printers/{printerId}/camera/snapshot | Última miniatura de cámara de la impresora (servida por el backend)
 [*PrintersApi*](doc/PrintersApi.md) | [**listPrinters**](doc/PrintersApi.md#listprinters) | **GET** /api/printers | Lista las impresoras con su estado en vivo
+[*ProductsApi*](doc/ProductsApi.md) | [**listProducts**](doc/ProductsApi.md#listproducts) | **GET** /api/products | Catálogo de productos (para nuevo pedido)
 [*PublicApi*](doc/PublicApi.md) | [**getBranding**](doc/PublicApi.md#getbranding) | **GET** /api/public/branding | Marca y configuración visible del negocio
+[*QueueApi*](doc/QueueApi.md) | [**acceptQueueAssignment**](doc/QueueApi.md#acceptqueueassignment) | **POST** /api/queue/accept | Acepta (total o parcialmente) una propuesta de asignación
 [*QueueApi*](doc/QueueApi.md) | [**getQueue**](doc/QueueApi.md#getqueue) | **GET** /api/queue | Cola de producción (items sin asignar y por impresora)
 [*QueueApi*](doc/QueueApi.md) | [**reorderQueue**](doc/QueueApi.md#reorderqueue) | **PATCH** /api/queue/reorder | Mueve y reordena items entre impresoras y la cola sin asignar
+[*QueueApi*](doc/QueueApi.md) | [**suggestQueueAssignment**](doc/QueueApi.md#suggestqueueassignment) | **POST** /api/queue/suggest | Propone una asignación de la cola (BE-13, BE-14)
 
 
 ## Documentation For Models
 
  - [Branding](doc/Branding.md)
+ - [Customer](doc/Customer.md)
+ - [DueState](doc/DueState.md)
  - [Error](doc/Error.md)
+ - [ItemState](doc/ItemState.md)
  - [LoginRequest](doc/LoginRequest.md)
  - [LoginResponse](doc/LoginResponse.md)
+ - [OrderCreateRequest](doc/OrderCreateRequest.md)
+ - [OrderDetail](doc/OrderDetail.md)
+ - [OrderItem](doc/OrderItem.md)
+ - [OrderItemInput](doc/OrderItemInput.md)
  - [OrderRef](doc/OrderRef.md)
+ - [OrderStatus](doc/OrderStatus.md)
+ - [OrderStatusUpdateRequest](doc/OrderStatusUpdateRequest.md)
+ - [OrderSummary](doc/OrderSummary.md)
+ - [PrintJob](doc/PrintJob.md)
+ - [PrintJobFailRequest](doc/PrintJobFailRequest.md)
+ - [PrintJobStartRequest](doc/PrintJobStartRequest.md)
  - [Printer](doc/Printer.md)
  - [PrinterState](doc/PrinterState.md)
+ - [Product](doc/Product.md)
  - [Queue](doc/Queue.md)
+ - [QueueAcceptEntry](doc/QueueAcceptEntry.md)
+ - [QueueAcceptRequest](doc/QueueAcceptRequest.md)
  - [QueueItem](doc/QueueItem.md)
  - [QueueItemState](doc/QueueItemState.md)
  - [QueueReorderEntry](doc/QueueReorderEntry.md)
  - [QueueReorderRequest](doc/QueueReorderRequest.md)
+ - [QueueSuggestion](doc/QueueSuggestion.md)
  - [RefreshRequest](doc/RefreshRequest.md)
  - [Role](doc/Role.md)
+ - [Shipment](doc/Shipment.md)
  - [SpoolRef](doc/SpoolRef.md)
  - [StatusEvent](doc/StatusEvent.md)
+ - [StatusHistoryEntry](doc/StatusHistoryEntry.md)
+ - [SuggestionAssignment](doc/SuggestionAssignment.md)
  - [User](doc/User.md)
 
 

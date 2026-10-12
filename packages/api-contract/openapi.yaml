@@ -22,6 +22,10 @@ tags:
   - name: public
   - name: printers
   - name: queue
+  - name: print-jobs
+  - name: orders
+  - name: customers
+  - name: products
 
 paths:
   /api/auth/login:
@@ -167,6 +171,275 @@ paths:
         '409':
           description: Conflicto de versión de la cola; recargar
 
+  /api/queue/suggest:
+    post:
+      tags: [queue]
+      operationId: suggestQueueAssignment
+      summary: Propone una asignación de la cola (BE-13, BE-14)
+      description: >-
+        El backend propone a qué impresora va cada item pendiente, con una
+        explicación legible. El operador decide aceptar todo, aceptar parcial o
+        descartar.
+      responses:
+        '200':
+          description: Propuesta con explicación por item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueSuggestion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Conflicto de versión de la cola; recargar
+
+  /api/queue/accept:
+    post:
+      tags: [queue]
+      operationId: acceptQueueAssignment
+      summary: Acepta (total o parcialmente) una propuesta de asignación
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueueAcceptRequest'
+      responses:
+        '200':
+          description: Cola actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Queue'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Conflicto de versión de la cola; recargar
+
+  /api/print-jobs:
+    post:
+      tags: [print-jobs]
+      operationId: startPrintJob
+      summary: Confirma e inicia la impresión de un item (BE-05)
+      description: >-
+        Requiere confirmación explícita del operador ("cama libre y filamento
+        correcto"). Nunca inicia impresiones de forma automática.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrintJobStartRequest'
+      responses:
+        '201':
+          description: Job iniciado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrintJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: La impresora no está disponible
+
+  /api/print-jobs/{jobId}/complete:
+    post:
+      tags: [print-jobs]
+      operationId: completePrintJob
+      summary: Marca un job como terminado
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Job actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrintJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Job no encontrado
+
+  /api/print-jobs/{jobId}/fail:
+    post:
+      tags: [print-jobs]
+      operationId: failPrintJob
+      summary: Marca un job como fallido y registra el motivo
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrintJobFailRequest'
+      responses:
+        '200':
+          description: Job actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrintJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Job no encontrado
+
+  /api/print-jobs/{jobId}/reprint:
+    post:
+      tags: [print-jobs]
+      operationId: reprintJob
+      summary: Crea un nuevo job para reimprimir un item fallido
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '201':
+          description: Nuevo job creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrintJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Job no encontrado
+
+  /api/orders:
+    get:
+      tags: [orders]
+      operationId: listOrders
+      summary: Lista pedidos con filtros y búsqueda por folio/cliente
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: customer_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: due_before
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: q
+          in: query
+          description: Búsqueda por folio o nombre de cliente
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pedidos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [orders]
+      operationId: createOrder
+      summary: Crea un pedido nuevo (P-09)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreateRequest'
+      responses:
+        '201':
+          description: Pedido creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Datos inválidos
+
+  /api/orders/{orderId}:
+    get:
+      tags: [orders]
+      operationId: getOrder
+      summary: Detalle de pedido (items, faltantes, historial, envío)
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Pedido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Pedido no encontrado
+
+  /api/orders/{orderId}/status:
+    patch:
+      tags: [orders]
+      operationId: updateOrderStatus
+      summary: Cambio manual de estado (Empacado, Enviado, Entregado, Cancelado)
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusUpdateRequest'
+      responses:
+        '200':
+          description: Pedido actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Pedido no encontrado
+
+  /api/customers:
+    get:
+      tags: [customers]
+      operationId: listCustomers
+      summary: Lista de clientes (para nuevo pedido)
+      responses:
+        '200':
+          description: Clientes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/products:
+    get:
+      tags: [products]
+      operationId: listProducts
+      summary: Catálogo de productos (para nuevo pedido)
+      responses:
+        '200':
+          description: Productos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 # Canal de tiempo real (WebSocket). OpenAPI no describe WebSocket de forma nativa;
 # se documenta mediante extensión para los generadores de clientes.
 x-websocket:
@@ -197,6 +470,22 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
 
   schemas:
     Error:
@@ -465,6 +754,370 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/QueueReorderEntry'
+
+    ItemState:
+      type: string
+      enum: [pending, queued, printing, printed, failed]
+
+    OrderStatus:
+      type: string
+      enum: [confirmed, queued, printing, printed, packed, shipped, delivered, cancelled]
+
+    DueState:
+      type: string
+      description: Derivado de la fecha prometida; alimenta las alertas visuales (P-07)
+      enum: [none, ok, due_soon, overdue]
+
+    Customer:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+
+    Product:
+      type: object
+      required: [id, name, base_price]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        material:
+          type: string
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        estimated_weight_g:
+          type: number
+          format: float
+          nullable: true
+        estimated_minutes:
+          type: integer
+          nullable: true
+        extra_cost:
+          type: number
+          format: float
+          nullable: true
+        has_gcode:
+          type: boolean
+          default: false
+        base_price:
+          type: number
+          format: float
+
+    OrderSummary:
+      type: object
+      required: [id, folio, customer_name, status, total, items_count, printed_count, due_state]
+      properties:
+        id:
+          type: integer
+          format: int64
+        folio:
+          type: string
+        customer_name:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        promised_date:
+          type: string
+          format: date
+          nullable: true
+        due_state:
+          $ref: '#/components/schemas/DueState'
+        total:
+          type: number
+          format: float
+        items_count:
+          type: integer
+        printed_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    OrderItem:
+      type: object
+      required: [id, product_id, product_name, quantity, printed_quantity, missing_quantity, state]
+      properties:
+        id:
+          type: integer
+          format: int64
+        product_id:
+          type: integer
+          format: int64
+        product_name:
+          type: string
+        color:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+        printed_quantity:
+          type: integer
+        missing_quantity:
+          type: integer
+        state:
+          $ref: '#/components/schemas/ItemState'
+        printer_id:
+          type: integer
+          format: int64
+          nullable: true
+        printer_name:
+          type: string
+          nullable: true
+
+    StatusHistoryEntry:
+      type: object
+      required: [status, occurred_at]
+      properties:
+        status:
+          type: string
+        previous_status:
+          type: string
+          nullable: true
+        user_name:
+          type: string
+          nullable: true
+        occurred_at:
+          type: string
+          format: date-time
+
+    Shipment:
+      type: object
+      required: [carrier]
+      properties:
+        carrier:
+          type: string
+        tracking_number:
+          type: string
+          nullable: true
+        tracking_url:
+          type: string
+          nullable: true
+        shipped_at:
+          type: string
+          format: date
+          nullable: true
+        delivered_at:
+          type: string
+          format: date
+          nullable: true
+
+    OrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/OrderSummary'
+        - type: object
+          required: [tracking_token, items, history]
+          properties:
+            tracking_token:
+              type: string
+            notes:
+              type: string
+              nullable: true
+            customer:
+              nullable: true
+              allOf:
+                - $ref: '#/components/schemas/Customer'
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderItem'
+            history:
+              type: array
+              items:
+                $ref: '#/components/schemas/StatusHistoryEntry'
+            shipment:
+              nullable: true
+              allOf:
+                - $ref: '#/components/schemas/Shipment'
+
+    OrderItemInput:
+      type: object
+      required: [product_id, quantity]
+      properties:
+        product_id:
+          type: integer
+          format: int64
+        color:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+          minimum: 1
+
+    OrderCreateRequest:
+      type: object
+      required: [items]
+      properties:
+        customer_id:
+          type: integer
+          format: int64
+          nullable: true
+        customer_name:
+          type: string
+          nullable: true
+        customer_phone:
+          type: string
+          nullable: true
+        promised_date:
+          type: string
+          format: date
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        total:
+          type: number
+          format: float
+          nullable: true
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItemInput'
+
+    OrderStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+
+    SuggestionAssignment:
+      type: object
+      required: [item_id, printer_id, printer_name, explanation]
+      properties:
+        item_id:
+          type: integer
+          format: int64
+        printer_id:
+          type: integer
+          format: int64
+        printer_name:
+          type: string
+        explanation:
+          type: string
+        order_folio:
+          type: string
+          nullable: true
+        product_name:
+          type: string
+          nullable: true
+        estimated_minutes:
+          type: integer
+          nullable: true
+
+    QueueSuggestion:
+      type: object
+      required: [version, assignments]
+      properties:
+        version:
+          type: integer
+        summary:
+          type: string
+          nullable: true
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/SuggestionAssignment'
+        unassigned_item_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    QueueAcceptEntry:
+      type: object
+      required: [item_id, printer_id]
+      properties:
+        item_id:
+          type: integer
+          format: int64
+        printer_id:
+          type: integer
+          format: int64
+
+    QueueAcceptRequest:
+      type: object
+      required: [version, assignments]
+      properties:
+        version:
+          type: integer
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueueAcceptEntry'
+
+    PrintJob:
+      type: object
+      required: [id, item_id, printer_id, state]
+      properties:
+        id:
+          type: integer
+          format: int64
+        item_id:
+          type: integer
+          format: int64
+        printer_id:
+          type: integer
+          format: int64
+        printer_name:
+          type: string
+          nullable: true
+        state:
+          $ref: '#/components/schemas/ItemState'
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        grams_real:
+          type: number
+          format: float
+          nullable: true
+        minutes_real:
+          type: integer
+          nullable: true
+        failure_reason:
+          type: string
+          nullable: true
+
+    PrintJobStartRequest:
+      type: object
+      required: [item_id, printer_id]
+      properties:
+        item_id:
+          type: integer
+          format: int64
+        printer_id:
+          type: integer
+          format: int64
+
+    PrintJobFailRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
 
     StatusEvent:
       type: object

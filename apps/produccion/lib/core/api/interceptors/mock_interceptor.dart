@@ -22,7 +22,12 @@ class MockInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final result = _backend.handle(options.method, options.path, options.data);
+    final result = _backend.handle(
+      options.method,
+      options.path,
+      options.data,
+      query: options.queryParameters,
+    );
     if (result == null) {
       return handler.next(options);
     }
