@@ -17,6 +17,9 @@ coverage/
 *.iws
 .idea/
 
+# openapi_generator (config/caché autogenerados)
+openapi_generator_config.json
+
 # Flutter generated (web/desktop ephemeral)
 apps/produccion/web/flutter_bootstrap.js
 apps/produccion/linux/flutter/ephemeral/
@@ -24,9 +27,6 @@ apps/produccion/android/.gradle/
 apps/produccion/ios/Pods/
 apps/produccion/macos/Pods/
 apps/produccion/windows/flutter/ephemeral/
-
-# Generated API client (regenerable con build_runner)
-apps/produccion/lib/src/api/generated/
 
 # --- Python (backend futuro) ---
 __pycache__/
