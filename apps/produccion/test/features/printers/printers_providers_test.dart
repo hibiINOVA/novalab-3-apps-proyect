@@ -34,7 +34,13 @@ void main() {
         entityId: 1,
       ),
     );
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    while ((container.read(printersProvider).value?.first.progress ?? 0) <=
+        43) {
+      expect(DateTime.now().isBefore(deadline), isTrue, reason: 'sin refresco');
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
 
     final refreshed = container.read(printersProvider).value!;
     expect(refreshed.first.progress, closeTo(45.0, 0.001));

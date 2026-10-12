@@ -58,6 +58,14 @@ abstract final class AppStrings {
   static const String queueEmptyColumn = 'Sin piezas';
   static const String queueReorderError =
       'No se pudo guardar el orden. Intenta de nuevo.';
+  static const String queueLoadError = 'No se pudo cargar la cola.';
+  static const String queuePieces = 'piezas';
+  static const String queueMissing = 'Faltan';
+  static const String queueEstimated = 'min';
+  static const String queueStatePending = 'Pendiente';
+  static const String queueStateQueued = 'En cola';
+  static const String queueStatePrinted = 'Impreso';
+  static const String queueStateFailed = 'Falló';
 
   // Generales
   static const String retry = 'Reintentar';
