@@ -2,7 +2,27 @@
 
 ## Estado del repositorio
 
-Este repo es **solo el documento de requerimientos** (`Novalab requerimientos.md`, v0.1, es-MX). **Todavía no hay código, manifests, tests, lint, CI ni git.** No inventes comandos de build/test/lint: aún no existen. La fuente de verdad es ese documento; si el código futuro lo contradice, gana el código.
+La fuente de verdad funcional es `Novalab requerimientos.md` (v0.1, es-MX); si el código la contradice, gana el código.
+
+Hoy existe la **rebanada vertical P-01..P-03 de `apps/produccion`** (Flutter), contract-first contra `packages/api-contract/openapi.yaml`, con cliente Dart generado en `packages/api_client`. El backend **aún no existe**: la app corre contra un backend simulado (`USE_MOCKS=true` por defecto). No hay CI todavía.
+
+### Comandos de `apps/produccion` (ejecutar con workdir `apps/produccion`)
+
+```
+flutter analyze                 # lint + tipos
+flutter test                    # pruebas (unit y widget)
+flutter run -d chrome           # desarrollo en navegador
+flutter build web --release     # build de entrega web
+flutter build linux             # build de escritorio
+flutter pub run build_runner build   # regenerar cliente desde el OpenAPI (~1 min)
+```
+
+Reglas de trabajo:
+- Un commit por paso, Conventional Commits (tipo en inglés, descripción en español).
+- Antes de commitear: `dart format lib test`, `flutter analyze`, `flutter test`.
+- No editar a mano `packages/api_client` (código generado). El contrato vive en `packages/api-contract/openapi.yaml`; el spec está fuera del package, así que `openapi_config.dart` usa `forceAlwaysRun: true` para forzar la regeneración.
+
+Credenciales demo del mock (cualquier contraseña `novalab`): `dueno@novalab.mx` (owner) u `operador@novalab.mx` (operator). Config vía `--dart-define`: `API_BASE_URL`, `USE_MOCKS`.
 
 ## Qué es NOVALAB
 
