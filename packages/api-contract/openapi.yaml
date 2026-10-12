@@ -101,6 +101,34 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/printers/{printerId}/camera/snapshot:
+    get:
+      tags: [printers]
+      operationId: getPrinterCameraSnapshot
+      summary: Última miniatura de cámara de la impresora (servida por el backend)
+      description: >-
+        Devuelve la última instantánea guardada por el backend (BE-07/08). El
+        cliente nunca accede al stream ni a la IP de la impresora.
+      parameters:
+        - name: printerId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Instantánea en PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: La impresora no tiene cámara o aún no hay snapshot
+
   /api/queue:
     get:
       tags: [queue]

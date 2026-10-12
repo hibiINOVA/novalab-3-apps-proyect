@@ -8,9 +8,17 @@ import '../config/app_config.dart';
 /// Configuración efectiva (`--dart-define`).
 final appConfigProvider = Provider<AppConfig>((ref) => AppConfig.current);
 
+/// Latencia simulada del backend mock (0 en pruebas).
+final mockLatencyProvider = Provider<Duration>(
+  (ref) => const Duration(milliseconds: 220),
+);
+
 /// Fábrica del cliente HTTP (única instancia, conserva el estado del mock).
 final apiClientFactoryProvider = Provider<ApiClientFactory>(
-  (ref) => ApiClientFactory(ref.watch(appConfigProvider)),
+  (ref) => ApiClientFactory(
+    ref.watch(appConfigProvider),
+    mockLatency: ref.watch(mockLatencyProvider),
+  ),
 );
 
 /// Cliente tipado generado desde OpenAPI.

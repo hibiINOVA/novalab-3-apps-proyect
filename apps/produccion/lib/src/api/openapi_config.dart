@@ -1,3 +1,4 @@
+// Openapi Generator last run: : 2026-10-12T13:00:22.792056
 // Configuración de generación del cliente Dart desde el contrato OpenAPI.
 //
 // El contrato único vive en `packages/api-contract/openapi.yaml` (doc §7).
@@ -20,5 +21,8 @@ import 'package:openapi_generator_annotations/openapi_generator_annotations.dart
   outputDirectory: '../../packages/api_client',
   runSourceGenOnOutput: true,
   fetchDependencies: true,
+  // El spec vive fuera del package, así que build_runner no puede detectar sus
+  // cambios; forzamos la regeneración en cada corrida (tarda ~1 min).
+  forceAlwaysRun: true,
 )
 class OpenApiClientGenerator {}

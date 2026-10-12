@@ -36,7 +36,7 @@ class MockInterceptor extends Interceptor {
       statusCode: result.statusCode,
       data: result.data,
       headers: Headers.fromMap(<String, List<String>>{
-        Headers.contentTypeHeader: <String>['application/json'],
+        Headers.contentTypeHeader: <String>[result.contentType],
       }),
     );
 

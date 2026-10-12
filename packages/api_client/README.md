@@ -67,6 +67,7 @@ Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
 [*AuthApi*](doc/AuthApi.md) | [**login**](doc/AuthApi.md#login) | **POST** /api/auth/login | Inicia sesión y devuelve tokens JWT
 [*AuthApi*](doc/AuthApi.md) | [**refreshToken**](doc/AuthApi.md#refreshtoken) | **POST** /api/auth/refresh | Renueva el access token
+[*PrintersApi*](doc/PrintersApi.md) | [**getPrinterCameraSnapshot**](doc/PrintersApi.md#getprintercamerasnapshot) | **GET** /api/printers/{printerId}/camera/snapshot | Última miniatura de cámara de la impresora (servida por el backend)
 [*PrintersApi*](doc/PrintersApi.md) | [**listPrinters**](doc/PrintersApi.md#listprinters) | **GET** /api/printers | Lista las impresoras con su estado en vivo
 [*PublicApi*](doc/PublicApi.md) | [**getBranding**](doc/PublicApi.md#getbranding) | **GET** /api/public/branding | Marca y configuración visible del negocio
 [*QueueApi*](doc/QueueApi.md) | [**getQueue**](doc/QueueApi.md#getqueue) | **GET** /api/queue | Cola de producción (items sin asignar y por impresora)

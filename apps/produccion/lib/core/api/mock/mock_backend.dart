@@ -5,17 +5,28 @@
 /// exista (ver AGENTS.md, handoff).
 library;
 
+import 'dart:convert';
+
 /// Credenciales de demostración aceptadas por el mock.
 const String kMockPassword = 'novalab';
 const String kMockOwnerEmail = 'dueno@novalab.mx';
 const String kMockOperatorEmail = 'operador@novalab.mx';
 
+/// Snapshot PNG de ejemplo (160x90) servido por el mock para la cámara (BE-07).
+const String kMockCameraPngBase64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAKAAAABaCAIAAACwpMoFAAACbUlEQVR42u3RV27cMABAQf47iZO4bU9325rei9Pr/a8TCtRCpLS6wMMD5gYT9g7mPRZ7h41rtWXlqGWVXD/OrQsnySa6kRtEj7v2h096PN0fNW7WnlXGLc+TW5Pci8I0eRndzs2iV10Hd173eHNwt3FYe1u51/IuObqfe194kHyIjnMPo49dJ48+9bg6Ob0K7oJ3+4LdhezuDHaXs9sNdhe1OyiD3aXt5sHuAncHp5+Du+DdFOwudndwFoPd5e4Wwe7ydptgd5G7dbC71N0q2F3w7uDsS3AXvJuC3cXuboPdhe4Oz2Owu9zdbrC7qN1WsLu03TzYXeDu8PxrcBe8m4Ldxe42we4id+tgd6m7VbC74N3hRRHsLm03D3YXuDu8+BbcBe+mYHexu6N2sLus3TLYXdxuFuwucXcb7C50d3QZg93l7o4uvwd3wbsp2F3sbh3sLnW3CnYXvFsGu4vbzYLdJe5ug92F7o7nP4K74N0U7C52d3ewu5jdHcHuknbbwe7Cdotgd3m7TbC7yN062F3q7nj+M7gL3h0veoPdJez2BbsL2d0Z7C5ntxvsLmp3Uga7S9vNg90F7k4Wv4K74N0U7C52d7KMwe5yd4tgd3m7TbC7yN062F3qbhXsLnh3svwd3AXvpmB3sbvbYHehu9NVDHaXu9sNdhe12wp2l7abB7sL3J2u/gR3wbsp2F3sbhPsLnK3DnaXulsFuwvena6LYHdpu3mwu8Dd6fpvcBe8m4Ldxe7O2sHusnbLYHdxu1mwu8TdbbC70N3ZJga7y92dbf4Fd8G7Kdhd7G4d7C51twp2F7xbBruL243+A+qp/ZNFR7ukAAAAAElFTkSuQmCC';
+
 /// Resultado de una petición simulada.
 class MockResponse {
-  const MockResponse(this.statusCode, this.data);
+  const MockResponse(
+    this.statusCode,
+    this.data, {
+    this.contentType = 'application/json',
+  });
 
   final int statusCode;
   final Object? data;
+  final String contentType;
 }
 
 class MockBackend {
@@ -187,6 +198,13 @@ class MockBackend {
   /// Devuelve `null` si la ruta no está simulada, para que la petición siga su
   /// curso hacia el backend real.
   MockResponse? handle(String method, String path, Object? body) {
+    final cameraMatch = RegExp(
+      r'^/api/printers/(\d+)/camera/snapshot$',
+    ).firstMatch(path);
+    if (method == 'GET' && cameraMatch != null) {
+      return _cameraSnapshot(int.parse(cameraMatch.group(1)!));
+    }
+
     switch ('$method $path') {
       case 'POST /api/auth/login':
         return _login(body);
@@ -290,5 +308,45 @@ class MockBackend {
     }
     _queueVersion++;
     return MockResponse(200, _buildQueue());
+  }
+
+  MockResponse _cameraSnapshot(int printerId) {
+    final match = _printers.where((p) => p['id'] == printerId).toList();
+    if (match.isEmpty || match.first['camera_available'] != true) {
+      return const MockResponse(404, <String, Object?>{
+        'code': 'camera_unavailable',
+        'message': 'La impresora no tiene cámara o aún no hay snapshot.',
+      });
+    }
+    return MockResponse(
+      200,
+      base64Decode(kMockCameraPngBase64),
+      contentType: 'image/png',
+    );
+  }
+
+  /// Avanza la simulación en vivo (P-02).
+  ///
+  /// Suma progreso y descuenta tiempo a la impresora que está imprimiendo y
+  /// devuelve su id, o `null` si ninguna cambió. La usa el cliente en tiempo
+  /// real simulado para provocar refrescos.
+  int? tick() {
+    for (final printer in _printers) {
+      if (printer['state'] != 'printing') continue;
+      final progress = (printer['progress'] as num?)?.toDouble() ?? 0;
+      final remaining = (printer['remaining_seconds'] as int?) ?? 0;
+      final next = (progress + 2.5).clamp(0, 100).toDouble();
+      printer['progress'] = next;
+      printer['remaining_seconds'] = (remaining - 30).clamp(0, remaining);
+      if (next >= 100) {
+        printer['state'] = 'idle';
+        printer['progress'] = null;
+        printer['remaining_seconds'] = null;
+        printer['current_file'] = null;
+        printer['current_order'] = null;
+      }
+      return printer['id'] as int;
+    }
+    return null;
   }
 }

@@ -38,6 +38,19 @@ abstract final class AppStrings {
   static const String printerNoOrder = 'Sin pedido';
   static const String printerCameraUnavailable = 'Cámara no disponible';
   static const String printerRemaining = 'Restante';
+  static const String printersTitle = 'Impresoras';
+  static const String printersEmpty = 'Aún no hay impresoras registradas.';
+  static const String printersLoadError =
+      'No se pudieron cargar las impresoras.';
+  static const String printerLive = 'En vivo';
+  static const String printerConnecting = 'Conectando…';
+  static const String printerNoConnection = 'Sin conexión en vivo';
+  static const String printerNozzle = 'Boquilla';
+  static const String printerBed = 'Cama';
+  static const String printerSpool = 'Filamento';
+  static const String printerOrder = 'Pedido';
+  static const String printerGramsRemaining = 'g restantes';
+  static const String printerFile = 'Archivo';
 
   // Cola (P-03)
   static const String queueTitle = 'Cola de producción';

@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/branding/branding_provider.dart';
 import '../../../core/i18n/app_strings.dart';
 import '../../auth/auth_providers.dart';
+import '../../printers/presentation/printers_tab.dart';
 import '../../queue/presentation/queue_tab.dart';
-import 'printers_tab.dart';
 
 /// Contenedor principal tras iniciar sesión.
 ///

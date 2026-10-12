@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:produccion/app.dart';
 import 'package:produccion/core/api/mock/mock_backend.dart';
+import 'package:produccion/core/config/app_providers.dart';
 import 'package:produccion/core/i18n/app_strings.dart';
+import 'package:produccion/core/realtime/realtime_client.dart';
+import 'package:produccion/core/realtime/realtime_providers.dart';
 import 'package:produccion/features/auth/auth_providers.dart';
 import 'package:produccion/features/auth/data/auth_token_store.dart';
 
@@ -14,7 +17,13 @@ void main() {
     final store = InMemoryAuthTokenStore();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [authTokenStoreProvider.overrideWithValue(store)],
+        overrides: [
+          authTokenStoreProvider.overrideWithValue(store),
+          mockLatencyProvider.overrideWithValue(Duration.zero),
+          realtimeClientProvider.overrideWithValue(
+            ManualRealtimeClient()..start(),
+          ),
+        ],
         child: const NovalabApp(),
       ),
     );
@@ -31,7 +40,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
-    expect(find.text(AppStrings.navPrinters), findsOneWidget);
+    expect(find.text(AppStrings.navPrinters), findsWidgets);
     expect(await store.read(), isNotNull);
 
     await tester.tap(find.byIcon(Icons.logout));
@@ -44,7 +53,13 @@ void main() {
     final store = InMemoryAuthTokenStore();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [authTokenStoreProvider.overrideWithValue(store)],
+        overrides: [
+          authTokenStoreProvider.overrideWithValue(store),
+          mockLatencyProvider.overrideWithValue(Duration.zero),
+          realtimeClientProvider.overrideWithValue(
+            ManualRealtimeClient()..start(),
+          ),
+        ],
         child: const NovalabApp(),
       ),
     );
