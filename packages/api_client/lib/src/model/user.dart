@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:novalab_api/src/model/membership_status.dart';
 import 'package:novalab_api/src/model/role.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -16,6 +17,9 @@ part 'user.g.dart';
 /// * [name]
 /// * [email]
 /// * [role]
+/// * [organizationId]
+/// * [organizationCode]
+/// * [membershipStatus]
 @BuiltValue()
 abstract class User implements Built<User, UserBuilder> {
   @BuiltValueField(wireName: r'id')
@@ -30,6 +34,16 @@ abstract class User implements Built<User, UserBuilder> {
   @BuiltValueField(wireName: r'role')
   Role get role;
   // enum roleEnum {  owner,  operator,  };
+
+  @BuiltValueField(wireName: r'organization_id')
+  int? get organizationId;
+
+  @BuiltValueField(wireName: r'organization_code')
+  String? get organizationCode;
+
+  @BuiltValueField(wireName: r'membership_status')
+  MembershipStatus? get membershipStatus;
+  // enum membershipStatusEnum {  none,  pending,  active,  rejected,  };
 
   User._();
 
@@ -74,6 +88,27 @@ class _$UserSerializer implements PrimitiveSerializer<User> {
       object.role,
       specifiedType: const FullType(Role),
     );
+    if (object.organizationId != null) {
+      yield r'organization_id';
+      yield serializers.serialize(
+        object.organizationId,
+        specifiedType: const FullType.nullable(int),
+      );
+    }
+    if (object.organizationCode != null) {
+      yield r'organization_code';
+      yield serializers.serialize(
+        object.organizationCode,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
+    if (object.membershipStatus != null) {
+      yield r'membership_status';
+      yield serializers.serialize(
+        object.membershipStatus,
+        specifiedType: const FullType(MembershipStatus),
+      );
+    }
   }
 
   @override
@@ -126,6 +161,29 @@ class _$UserSerializer implements PrimitiveSerializer<User> {
             specifiedType: const FullType(Role),
           ) as Role;
           result.role = valueDes;
+          break;
+        case r'organization_id':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(int),
+          ) as int?;
+          if (valueDes == null) continue;
+          result.organizationId = valueDes;
+          break;
+        case r'organization_code':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.organizationCode = valueDes;
+          break;
+        case r'membership_status':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(MembershipStatus),
+          ) as MembershipStatus;
+          result.membershipStatus = valueDes;
           break;
         default:
           unhandled.add(key);

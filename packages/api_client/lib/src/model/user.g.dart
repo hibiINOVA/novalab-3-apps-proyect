@@ -15,6 +15,12 @@ class _$User extends User {
   final String email;
   @override
   final Role role;
+  @override
+  final int? organizationId;
+  @override
+  final String? organizationCode;
+  @override
+  final MembershipStatus? membershipStatus;
 
   factory _$User([void Function(UserBuilder)? updates]) =>
       (UserBuilder()..update(updates))._build();
@@ -23,7 +29,10 @@ class _$User extends User {
       {required this.id,
       required this.name,
       required this.email,
-      required this.role})
+      required this.role,
+      this.organizationId,
+      this.organizationCode,
+      this.membershipStatus})
       : super._();
   @override
   User rebuild(void Function(UserBuilder) updates) =>
@@ -39,7 +48,10 @@ class _$User extends User {
         id == other.id &&
         name == other.name &&
         email == other.email &&
-        role == other.role;
+        role == other.role &&
+        organizationId == other.organizationId &&
+        organizationCode == other.organizationCode &&
+        membershipStatus == other.membershipStatus;
   }
 
   @override
@@ -49,6 +61,9 @@ class _$User extends User {
     _$hash = $jc(_$hash, name.hashCode);
     _$hash = $jc(_$hash, email.hashCode);
     _$hash = $jc(_$hash, role.hashCode);
+    _$hash = $jc(_$hash, organizationId.hashCode);
+    _$hash = $jc(_$hash, organizationCode.hashCode);
+    _$hash = $jc(_$hash, membershipStatus.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -59,7 +74,10 @@ class _$User extends User {
           ..add('id', id)
           ..add('name', name)
           ..add('email', email)
-          ..add('role', role))
+          ..add('role', role)
+          ..add('organizationId', organizationId)
+          ..add('organizationCode', organizationCode)
+          ..add('membershipStatus', membershipStatus))
         .toString();
   }
 }
@@ -83,6 +101,21 @@ class UserBuilder implements Builder<User, UserBuilder> {
   Role? get role => _$this._role;
   set role(Role? role) => _$this._role = role;
 
+  int? _organizationId;
+  int? get organizationId => _$this._organizationId;
+  set organizationId(int? organizationId) =>
+      _$this._organizationId = organizationId;
+
+  String? _organizationCode;
+  String? get organizationCode => _$this._organizationCode;
+  set organizationCode(String? organizationCode) =>
+      _$this._organizationCode = organizationCode;
+
+  MembershipStatus? _membershipStatus;
+  MembershipStatus? get membershipStatus => _$this._membershipStatus;
+  set membershipStatus(MembershipStatus? membershipStatus) =>
+      _$this._membershipStatus = membershipStatus;
+
   UserBuilder() {
     User._defaults(this);
   }
@@ -94,6 +127,9 @@ class UserBuilder implements Builder<User, UserBuilder> {
       _name = $v.name;
       _email = $v.email;
       _role = $v.role;
+      _organizationId = $v.organizationId;
+      _organizationCode = $v.organizationCode;
+      _membershipStatus = $v.membershipStatus;
       _$v = null;
     }
     return this;
@@ -119,6 +155,9 @@ class UserBuilder implements Builder<User, UserBuilder> {
           name: BuiltValueNullFieldError.checkNotNull(name, r'User', 'name'),
           email: BuiltValueNullFieldError.checkNotNull(email, r'User', 'email'),
           role: BuiltValueNullFieldError.checkNotNull(role, r'User', 'role'),
+          organizationId: organizationId,
+          organizationCode: organizationCode,
+          membershipStatus: membershipStatus,
         );
     replace(_$result);
     return _$result;

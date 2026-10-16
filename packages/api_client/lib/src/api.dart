@@ -12,6 +12,7 @@ import 'package:novalab_api/src/auth/oauth.dart';
 import 'package:novalab_api/src/api/auth_api.dart';
 import 'package:novalab_api/src/api/customers_api.dart';
 import 'package:novalab_api/src/api/orders_api.dart';
+import 'package:novalab_api/src/api/organizations_api.dart';
 import 'package:novalab_api/src/api/print_jobs_api.dart';
 import 'package:novalab_api/src/api/printers_api.dart';
 import 'package:novalab_api/src/api/products_api.dart';
@@ -99,6 +100,12 @@ class NovalabApi {
   /// by doing that all interceptors will not be executed
   OrdersApi getOrdersApi() {
     return OrdersApi(dio, serializers);
+  }
+
+  /// Get OrganizationsApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  OrganizationsApi getOrganizationsApi() {
+    return OrganizationsApi(dio, serializers);
   }
 
   /// Get PrintJobsApi instance, base route and serializer can be overridden by a given but be careful,

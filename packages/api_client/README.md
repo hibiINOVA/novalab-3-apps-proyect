@@ -67,11 +67,18 @@ Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
 [*AuthApi*](doc/AuthApi.md) | [**login**](doc/AuthApi.md#login) | **POST** /api/auth/login | Inicia sesión y devuelve tokens JWT
 [*AuthApi*](doc/AuthApi.md) | [**refreshToken**](doc/AuthApi.md#refreshtoken) | **POST** /api/auth/refresh | Renueva el access token
+[*AuthApi*](doc/AuthApi.md) | [**register**](doc/AuthApi.md#register) | **POST** /api/auth/register | Crea una cuenta nueva y devuelve tokens (registro abierto)
 [*CustomersApi*](doc/CustomersApi.md) | [**listCustomers**](doc/CustomersApi.md#listcustomers) | **GET** /api/customers | Lista de clientes (para nuevo pedido)
 [*OrdersApi*](doc/OrdersApi.md) | [**createOrder**](doc/OrdersApi.md#createorder) | **POST** /api/orders | Crea un pedido nuevo (P-09)
 [*OrdersApi*](doc/OrdersApi.md) | [**getOrder**](doc/OrdersApi.md#getorder) | **GET** /api/orders/{orderId} | Detalle de pedido (items, faltantes, historial, envío)
 [*OrdersApi*](doc/OrdersApi.md) | [**listOrders**](doc/OrdersApi.md#listorders) | **GET** /api/orders | Lista pedidos con filtros y búsqueda por folio/cliente
 [*OrdersApi*](doc/OrdersApi.md) | [**updateOrderStatus**](doc/OrdersApi.md#updateorderstatus) | **PATCH** /api/orders/{orderId}/status | Cambio manual de estado (Empacado, Enviado, Entregado, Cancelado)
+[*OrganizationsApi*](doc/OrganizationsApi.md) | [**approveOrganizationRequest**](doc/OrganizationsApi.md#approveorganizationrequest) | **POST** /api/organizations/requests/{requestId}/approve | Dueño acepta la solicitud de un operador
+[*OrganizationsApi*](doc/OrganizationsApi.md) | [**createOrganization**](doc/OrganizationsApi.md#createorganization) | **POST** /api/organizations | Crea una organización nueva (Dueño) y genera su ID único
+[*OrganizationsApi*](doc/OrganizationsApi.md) | [**getCurrentOrganization**](doc/OrganizationsApi.md#getcurrentorganization) | **GET** /api/organizations/current | Obtiene el estado actual de la organización y membresía del usuario
+[*OrganizationsApi*](doc/OrganizationsApi.md) | [**joinOrganization**](doc/OrganizationsApi.md#joinorganization) | **POST** /api/organizations/join | Operador solicita unirse a una organización usando su ID
+[*OrganizationsApi*](doc/OrganizationsApi.md) | [**listOrganizationRequests**](doc/OrganizationsApi.md#listorganizationrequests) | **GET** /api/organizations/requests | Lista de solicitudes pendientes de operadores (Dueño)
+[*OrganizationsApi*](doc/OrganizationsApi.md) | [**rejectOrganizationRequest**](doc/OrganizationsApi.md#rejectorganizationrequest) | **POST** /api/organizations/requests/{requestId}/reject | Dueño rechaza la solicitud de un operador
 [*PrintJobsApi*](doc/PrintJobsApi.md) | [**completePrintJob**](doc/PrintJobsApi.md#completeprintjob) | **POST** /api/print-jobs/{jobId}/complete | Marca un job como terminado
 [*PrintJobsApi*](doc/PrintJobsApi.md) | [**failPrintJob**](doc/PrintJobsApi.md#failprintjob) | **POST** /api/print-jobs/{jobId}/fail | Marca un job como fallido y registra el motivo
 [*PrintJobsApi*](doc/PrintJobsApi.md) | [**reprintJob**](doc/PrintJobsApi.md#reprintjob) | **POST** /api/print-jobs/{jobId}/reprint | Crea un nuevo job para reimprimir un item fallido
@@ -80,6 +87,9 @@ Class | Method | HTTP request | Description
 [*PrintersApi*](doc/PrintersApi.md) | [**listPrinters**](doc/PrintersApi.md#listprinters) | **GET** /api/printers | Lista las impresoras con su estado en vivo
 [*ProductsApi*](doc/ProductsApi.md) | [**listProducts**](doc/ProductsApi.md#listproducts) | **GET** /api/products | Catálogo de productos (para nuevo pedido)
 [*PublicApi*](doc/PublicApi.md) | [**getBranding**](doc/PublicApi.md#getbranding) | **GET** /api/public/branding | Marca y configuración visible del negocio
+[*PublicApi*](doc/PublicApi.md) | [**getPublicTrack**](doc/PublicApi.md#getpublictrack) | **GET** /api/public/track/{token} | Seguimiento público de pedido por token
+[*PublicApi*](doc/PublicApi.md) | [**getPublicTrackCamera**](doc/PublicApi.md#getpublictrackcamera) | **GET** /api/public/track/{token}/camera | Snapshot de cámara mientras el pedido está imprimiendo (público)
+[*PublicApi*](doc/PublicApi.md) | [**lookupOrderToken**](doc/PublicApi.md#lookupordertoken) | **POST** /api/public/lookup | Obtener tracking_token por folio y últimos 4 dígitos del teléfono
 [*QueueApi*](doc/QueueApi.md) | [**acceptQueueAssignment**](doc/QueueApi.md#acceptqueueassignment) | **POST** /api/queue/accept | Acepta (total o parcialmente) una propuesta de asignación
 [*QueueApi*](doc/QueueApi.md) | [**getQueue**](doc/QueueApi.md#getqueue) | **GET** /api/queue | Cola de producción (items sin asignar y por impresora)
 [*QueueApi*](doc/QueueApi.md) | [**reorderQueue**](doc/QueueApi.md#reorderqueue) | **PATCH** /api/queue/reorder | Mueve y reordena items entre impresoras y la cola sin asignar
@@ -93,8 +103,10 @@ Class | Method | HTTP request | Description
  - [DueState](doc/DueState.md)
  - [Error](doc/Error.md)
  - [ItemState](doc/ItemState.md)
+ - [JoinOrganizationRequest](doc/JoinOrganizationRequest.md)
  - [LoginRequest](doc/LoginRequest.md)
  - [LoginResponse](doc/LoginResponse.md)
+ - [MembershipStatus](doc/MembershipStatus.md)
  - [OrderCreateRequest](doc/OrderCreateRequest.md)
  - [OrderDetail](doc/OrderDetail.md)
  - [OrderItem](doc/OrderItem.md)
@@ -103,12 +115,17 @@ Class | Method | HTTP request | Description
  - [OrderStatus](doc/OrderStatus.md)
  - [OrderStatusUpdateRequest](doc/OrderStatusUpdateRequest.md)
  - [OrderSummary](doc/OrderSummary.md)
+ - [Organization](doc/Organization.md)
+ - [OrganizationCreateRequest](doc/OrganizationCreateRequest.md)
+ - [OrganizationMember](doc/OrganizationMember.md)
  - [PrintJob](doc/PrintJob.md)
  - [PrintJobFailRequest](doc/PrintJobFailRequest.md)
  - [PrintJobStartRequest](doc/PrintJobStartRequest.md)
  - [Printer](doc/Printer.md)
  - [PrinterState](doc/PrinterState.md)
  - [Product](doc/Product.md)
+ - [PublicLookupRequest](doc/PublicLookupRequest.md)
+ - [PublicLookupResponse](doc/PublicLookupResponse.md)
  - [Queue](doc/Queue.md)
  - [QueueAcceptEntry](doc/QueueAcceptEntry.md)
  - [QueueAcceptRequest](doc/QueueAcceptRequest.md)
@@ -118,6 +135,7 @@ Class | Method | HTTP request | Description
  - [QueueReorderRequest](doc/QueueReorderRequest.md)
  - [QueueSuggestion](doc/QueueSuggestion.md)
  - [RefreshRequest](doc/RefreshRequest.md)
+ - [RegisterRequest](doc/RegisterRequest.md)
  - [Role](doc/Role.md)
  - [Shipment](doc/Shipment.md)
  - [SpoolRef](doc/SpoolRef.md)
@@ -125,6 +143,7 @@ Class | Method | HTTP request | Description
  - [StatusHistoryEntry](doc/StatusHistoryEntry.md)
  - [SuggestionAssignment](doc/SuggestionAssignment.md)
  - [User](doc/User.md)
+ - [UserOrganizationStatus](doc/UserOrganizationStatus.md)
 
 
 ## Documentation For Authorization

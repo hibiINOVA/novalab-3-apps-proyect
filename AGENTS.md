@@ -1,57 +1,81 @@
 # AGENTS.md
 
-## Estado del repositorio
+## Source of truth
 
-La fuente de verdad funcional es `Novalab requerimientos.md` (v0.1, es-MX); si el código la contradice, gana el código.
+- Functional truth: `Novalab requerimientos.md` (v0.1, es-MX). If code contradicts docs, **code wins**.
+- Contract: `packages/api-contract/openapi.yaml`. Typed clients generated from it; never duplicate types or calculations.
+- Requirements IDs: cite `BE-xx`, `P-xx`, `C-xx`, `F-xx` when working.
 
-Hoy existe la **rebanada vertical P-01..P-03 de `apps/produccion`** (Flutter), contract-first contra `packages/api-contract/openapi.yaml`, con cliente Dart generado en `packages/api_client`. El backend **aún no existe**: la app corre contra un backend simulado (`USE_MOCKS=true` por defecto). No hay CI todavía.
+## Repo state
 
-### Comandos de `apps/produccion` (ejecutar con workdir `apps/produccion`)
+- Monorepo reorganized by folders: `Producción/`, `Seguimiento del cliente/` (planned), `Finanzas/` (planned), `Backend único/`, `packages/`, `deploy/` (planned), `docs/` (planned).
+- `Producción/` (Flutter) vertical slice: **P-01..P-03**. `Backend único/` (FastAPI) implements all contract endpoints + seed demo.
+- `Producción/` runs against mocks by default (`USE_MOCKS=true`); point `API_BASE_URL` at backend to go live.
+- No CI yet. Generated Dart client is in `packages/api_client` (do not edit manually).
+- `Producción/lib/src/api/openapi_config.dart` uses `@Openapi(forceAlwaysRun: true)` because spec lives outside the package.
 
+## Entry points & boundaries
+
+- **Producción/** (`apps/produccion` renamed): Flutter (web/tablet/desktop). Auth (P-01), printers dashboard (P-02), queue (P-03). Uses Riverpod + go_router.
+- **packages/api-contract/openapi.yaml**: single OpenAPI contract; generates `packages/api_client` (Dart/dio, pubName `novalab_api`).
+- **packages/api_client**: generated output — never edit. Regenerate from contract.
+- **Backend único/**: FastAPI + SQLite + Alembic. Business logic, state machines, queue rules, and **all finance formulas** live only there.
+- **Seguimiento del cliente/** (planned): SvelteKit static (public, anonymous — only sees own `tracking_token`). **Must not** expose costs/profits/other clients/internal IPs (public tracking app).
+- **Finanzas/** (planned): React + Vite + TS (private). Finance calculations come from backend.
+- **deploy/** (planned): docker-compose, Caddyfile, install.sh.
+- **docs/** (planned).
+
+## Commands (exact)
+
+Run Flutter commands from `Producción/` (workdir):
+
+```bash
+flutter analyze                 # lint + types
+flutter test                    # unit + widget tests
+flutter run -d chrome           # dev
+flutter build web --release     # web build
+flutter build linux             # desktop build
+flutter pub run build_runner build --delete-conflicting-outputs  # regenerate client from OpenAPI (~1 min)
+dart format lib test            # format before commit
 ```
-flutter analyze                 # lint + tipos
-flutter test                    # pruebas (unit y widget)
-flutter run -d chrome           # desarrollo en navegador
-flutter build web --release     # build de entrega web
-flutter build linux             # build de escritorio
-flutter pub run build_runner build   # regenerar cliente desde el OpenAPI (~1 min)
+
+Run backend commands from `Backend único/` (workdir):
+
+```bash
+source .venv/bin/activate       # venv (already created)
+uvicorn app.main:app --port 8081   # dev server (auto-creates tables + seed)
+python -m pytest tests/ -q      # 17 tests
+alembic upgrade head            # apply migrations (fresh DBs only)
 ```
 
-Reglas de trabajo:
-- Un commit por paso, Conventional Commits (tipo en inglés, descripción en español).
-- Antes de commitear: `dart format lib test`, `flutter analyze`, `flutter test`.
-- No editar a mano `packages/api_client` (código generado). El contrato vive en `packages/api-contract/openapi.yaml`; el spec está fuera del package, así que `openapi_config.dart` usa `forceAlwaysRun: true` para forzar la regeneración.
+Env/config via `--dart-define`: `API_BASE_URL`, `USE_MOCKS` (defaults `true`).
 
-Credenciales demo del mock (cualquier contraseña `novalab`): `dueno@novalab.mx` (owner) u `operador@novalab.mx` (operator). Config vía `--dart-define`: `API_BASE_URL`, `USE_MOCKS`.
+Demo creds (mock + backend seed, password `novalab`): `dueno@novalab.mx` (owner), `operador@novalab.mx` (operator).
 
-## Qué es NOVALAB
+## Critical invariants
 
-Un backend y tres frontends para negocios de impresión 3D, autoalojado (una instalación = un negocio = una Raspberry Pi/mini PC). Los requerimientos usan IDs (`BE-xx` backend, `P-xx` producción, `C-xx` cliente, `F-xx` finanzas); cítalos al trabajar.
+- Business logic (state machines, queue/missing parts, **all finance formulas**) lives only in `Backend único/`. Frontends present only.
+- OpenAPI is the single contract. Generate typed clients for all 3 apps (Dart/TS). Don't duplicate types/calculations.
+- **Two-port topology** (planned): public serves only `Seguimiento del cliente/` + `/api/public/*`; private (LAN/VPN/Cloudflare Access) serves `Producción/` (`/admin`), `Finanzas/` (`/finanzas`), full `/api` + WebSocket.
+- Public API never exposes costs, profits, other clients, or internal IPs (BE-21, BE-22). Client is anonymous, only sees own `tracking_token`.
+- Never auto-start prints: sending G-code requires explicit operator confirmation (BE-05, P-05).
+- Single-tenant: one business per install; no `org_id`.
+- Camera served via backend snapshot only (no raw stream/IP exposure) (BE-08).
+- Defaults: `es-MX`, texts externalized, currency/timezone configurable (doc §3.12, §7). Branding from `GET /api/public/branding`.
 
-Estructura planeada (monorepo):
+## Testing notes
 
-```
-backend/            FastAPI + SQLite + Alembic + pytest
-apps/produccion/    Flutter (web/tablet/escritorio)
-apps/cliente/       SvelteKit adapter-static (público, sin login)
-apps/finanzas/      React + Vite + TypeScript
-packages/design-tokens/
-deploy/             docker-compose.yml, Caddyfile, install.sh
-docs/
-```
+- `flutter test` in `Producción/` covers auth/session, live dashboard (controlled WS), queue drag/reorder, es-MX formatting, responsive nav.
+- Mock latency disabled in tests via `mockLatencyProvider`.
+- `python -m pytest tests/` in `Backend único/` covers auth, queue version 409, jobs lifecycle, orders/status, public track/lookup, finance formulas, WS hello.
 
-## Invariantes que un agente rompería sin saberlo
+## Conventions
 
-- **La lógica de negocio vive solo en el backend**: máquinas de estado, cola/faltantes y **todas las fórmulas de finanzas**. Los frontends solo presentan (doc §3.8, §6 no funcionales).
-- **OpenAPI es el contrato único.** De él se generan los clientes tipados de las 3 apps (Dart y TypeScript). No dupliques tipos ni cálculos a mano.
-- **Dos puertos**: el público solo sirve `apps/cliente` + `/api/public/*`; producción (`/admin`), finanzas (`/finanzas`) y `/api` completo (+ WebSocket) son privados (LAN/VPN/Cloudflare Access) (doc §2).
-- **La API pública nunca expone costos, ganancias, otros clientes ni IPs internas** (BE-21, BE-22). El cliente final es anónimo y solo ve datos de su propio `tracking_token`.
-- **Nunca iniciar impresiones automáticamente**: el envío de gcode requiere confirmación explícita del operador (BE-05, P-05).
-- **Sin `org_id`**: un negocio por instalación. No agregues multi-tenant.
-- **La cámara se sirve a través del backend** (snapshot), nunca se expone el stream ni la IP de la impresora (BE-08).
-- **Idioma por defecto `es-MX`**; textos externalizados, moneda y zona horaria configurables (doc §7, §3.12).
-- Marcas y colores por negocio se leen de `GET /api/public/branding`.
+- One commit per step, Conventional Commits (type in English, description in Spanish).
+- Before committing: from `Producción/`, run `dart format lib test && flutter analyze && flutter test` (when touching that app).
+- Never edit `packages/api_client` manually. Contract is `packages/api-contract/openapi.yaml`; if contract changes, regenerate (from `Producción/` as shown above, or per target app).
+- Read `Novalab requerimientos.md` for behavioral details; cite requirement IDs in work.
 
-## Fuera de alcance en v1 (no lo implementes)
+## Out of scope (v1)
 
-Pagos/tienda en línea, API de Estafeta (solo guía manual + link), notificaciones push/WhatsApp/email, video en vivo/timelapse, inicio automático de impresiones, multi-sucursal (doc §10).
+Payments/storefront, Estafeta API (manual label/link only), push/WhatsApp/email, live video/timelapse, auto-start prints, multi-location (doc §10).
