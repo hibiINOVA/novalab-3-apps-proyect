@@ -8,6 +8,7 @@ import '../../../core/realtime/realtime_providers.dart';
 import '../../../core/theme/design_tokens.dart';
 import '../printers_providers.dart';
 import 'printer_card.dart';
+import 'printer_form_dialog.dart';
 
 /// Tablero de impresoras (P-02).
 ///
@@ -72,11 +73,20 @@ class _LiveBar extends ConsumerWidget {
       ),
       child: Row(
         children: <Widget>[
-          Text(
-            AppStrings.printersTitle,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          Expanded(
+            child: Text(
+              AppStrings.printersTitle,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(width: DesignTokens.spaceMd),
+          FilledButton.tonalIcon(
+            onPressed: () => PrinterFormDialog.show(context),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text(AppStrings.printerAdd),
           ),
           const Spacer(),
           Container(

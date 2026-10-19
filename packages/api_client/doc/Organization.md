@@ -12,6 +12,10 @@ Name | Type | Description | Notes
 **code** | **String** | ID único de la organización para compartir con operadores (p. ej. ORG-NOVA-8492) | 
 **name** | **String** |  | 
 **ownerId** | **int** |  | 
+**description** | **String** |  | [optional] 
+**vision** | **String** |  | [optional] 
+**mission** | **String** |  | [optional] 
+**hasLogo** | **bool** |  | [optional] [default to false]
 **createdAt** | [**DateTime**](DateTime.md) |  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

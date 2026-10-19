@@ -4,6 +4,7 @@ import 'package:novalab_api/novalab_api.dart';
 
 import '../../../core/i18n/app_strings.dart';
 import '../../../core/theme/design_tokens.dart';
+import '../../orders/presentation/new_order_dialog.dart';
 import '../../printers/printers_providers.dart';
 import '../queue_providers.dart';
 import 'queue_column.dart';
@@ -49,6 +50,12 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
+              FilledButton.icon(
+                onPressed: () => NewOrderDialog.show(context),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text(AppStrings.orderNew),
+              ),
+              const SizedBox(width: DesignTokens.spaceSm),
               FilledButton.tonalIcon(
                 onPressed: _requesting ? null : _handleSuggest,
                 icon: _requesting

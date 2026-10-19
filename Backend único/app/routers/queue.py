@@ -23,8 +23,8 @@ def get_queue(db: Session = Depends(get_db)):
     return queue_service.build_queue(db)
 
 
-@router.post("/reorder", operation_id="reorderQueue",
-             dependencies=[Depends(get_current_user)])
+@router.patch("/reorder", operation_id="reorderQueue", response_model=Queue,
+              dependencies=[Depends(get_current_user)])
 async def reorder(body: QueueReorderRequest, db: Session = Depends(get_db)):
     """BE-12/optimistic concurrency: 409 si `version` no coincide."""
     if not queue_service.check_version(db, body.version):
@@ -38,7 +38,7 @@ async def reorder(body: QueueReorderRequest, db: Session = Depends(get_db)):
         db, [e.model_dump() for e in body.items]
     )
     await hub.broadcast("queue.updated", "queue", payload={"version": version})
-    return {"version": version}
+    return queue_service.build_queue(db)
 
 
 @router.post("/suggest", operation_id="suggestQueueAssignment",
@@ -49,7 +49,7 @@ def suggest(db: Session = Depends(get_db)):
 
 
 @router.post("/accept", operation_id="acceptQueueAssignment",
-             dependencies=[Depends(get_current_user)])
+             response_model=Queue, dependencies=[Depends(get_current_user)])
 async def accept(body: QueueAcceptRequest, db: Session = Depends(get_db)):
     if not queue_service.check_version(db, body.version):
         raise HTTPException(
@@ -62,4 +62,4 @@ async def accept(body: QueueAcceptRequest, db: Session = Depends(get_db)):
         db, [e.model_dump() for e in body.assignments]
     )
     await hub.broadcast("queue.updated", "queue", payload={"version": version})
-    return {"version": version}
+    return queue_service.build_queue(db)

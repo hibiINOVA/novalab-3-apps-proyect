@@ -16,6 +16,14 @@ class _$Organization extends Organization {
   @override
   final int ownerId;
   @override
+  final String? description;
+  @override
+  final String? vision;
+  @override
+  final String? mission;
+  @override
+  final bool? hasLogo;
+  @override
   final DateTime? createdAt;
 
   factory _$Organization([void Function(OrganizationBuilder)? updates]) =>
@@ -26,6 +34,10 @@ class _$Organization extends Organization {
       required this.code,
       required this.name,
       required this.ownerId,
+      this.description,
+      this.vision,
+      this.mission,
+      this.hasLogo,
       this.createdAt})
       : super._();
   @override
@@ -43,6 +55,10 @@ class _$Organization extends Organization {
         code == other.code &&
         name == other.name &&
         ownerId == other.ownerId &&
+        description == other.description &&
+        vision == other.vision &&
+        mission == other.mission &&
+        hasLogo == other.hasLogo &&
         createdAt == other.createdAt;
   }
 
@@ -53,6 +69,10 @@ class _$Organization extends Organization {
     _$hash = $jc(_$hash, code.hashCode);
     _$hash = $jc(_$hash, name.hashCode);
     _$hash = $jc(_$hash, ownerId.hashCode);
+    _$hash = $jc(_$hash, description.hashCode);
+    _$hash = $jc(_$hash, vision.hashCode);
+    _$hash = $jc(_$hash, mission.hashCode);
+    _$hash = $jc(_$hash, hasLogo.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -65,6 +85,10 @@ class _$Organization extends Organization {
           ..add('code', code)
           ..add('name', name)
           ..add('ownerId', ownerId)
+          ..add('description', description)
+          ..add('vision', vision)
+          ..add('mission', mission)
+          ..add('hasLogo', hasLogo)
           ..add('createdAt', createdAt))
         .toString();
   }
@@ -90,6 +114,22 @@ class OrganizationBuilder
   int? get ownerId => _$this._ownerId;
   set ownerId(int? ownerId) => _$this._ownerId = ownerId;
 
+  String? _description;
+  String? get description => _$this._description;
+  set description(String? description) => _$this._description = description;
+
+  String? _vision;
+  String? get vision => _$this._vision;
+  set vision(String? vision) => _$this._vision = vision;
+
+  String? _mission;
+  String? get mission => _$this._mission;
+  set mission(String? mission) => _$this._mission = mission;
+
+  bool? _hasLogo;
+  bool? get hasLogo => _$this._hasLogo;
+  set hasLogo(bool? hasLogo) => _$this._hasLogo = hasLogo;
+
   DateTime? _createdAt;
   DateTime? get createdAt => _$this._createdAt;
   set createdAt(DateTime? createdAt) => _$this._createdAt = createdAt;
@@ -105,6 +145,10 @@ class OrganizationBuilder
       _code = $v.code;
       _name = $v.name;
       _ownerId = $v.ownerId;
+      _description = $v.description;
+      _vision = $v.vision;
+      _mission = $v.mission;
+      _hasLogo = $v.hasLogo;
       _createdAt = $v.createdAt;
       _$v = null;
     }
@@ -134,6 +178,10 @@ class OrganizationBuilder
               name, r'Organization', 'name'),
           ownerId: BuiltValueNullFieldError.checkNotNull(
               ownerId, r'Organization', 'ownerId'),
+          description: description,
+          vision: vision,
+          mission: mission,
+          hasLogo: hasLogo,
           createdAt: createdAt,
         );
     replace(_$result);

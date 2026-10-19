@@ -15,6 +15,13 @@ class Role(str, Enum):
     operator = "operator"
 
 
+class MembershipStatus(str, Enum):
+    none = "none"
+    pending = "pending"
+    active = "active"
+    rejected = "rejected"
+
+
 class PrinterState(str, Enum):
     idle = "idle"
     printing = "printing"
@@ -60,6 +67,9 @@ class User(BaseModel):
     name: str
     email: str
     role: Role
+    organization_id: int | None = None
+    organization_code: str | None = None
+    membership_status: MembershipStatus = MembershipStatus.none
 
 
 class LoginRequest(BaseModel):
@@ -83,6 +93,61 @@ class LoginResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: User
+
+
+# --- organizations ---------------------------------------------------------
+class Organization(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    name: str
+    description: str | None = None
+    vision: str | None = None
+    mission: str | None = None
+    has_logo: bool = False
+    owner_id: int
+    created_at: datetime | None = None
+
+
+class OrganizationCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    vision: str | None = Field(default=None, max_length=2000)
+    mission: str | None = Field(default=None, max_length=2000)
+
+
+class OrganizationUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    vision: str | None = Field(default=None, max_length=2000)
+    mission: str | None = Field(default=None, max_length=2000)
+
+
+class JoinOrganizationRequest(BaseModel):
+    organization_code: str = Field(min_length=1, max_length=40)
+
+
+class OrganizationMember(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    user_name: str
+    user_email: str
+    role: Role
+    status: MembershipStatus
+    organization_code: str | None = None
+    organization_name: str | None = None
+    created_at: datetime | None = None
+
+
+class UserOrganizationStatus(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    organization: Organization | None = None
+    membership_status: MembershipStatus = MembershipStatus.none
+    pending_requests_count: int = 0
 
 
 # --- error / branding ------------------------------------------------------
@@ -126,6 +191,7 @@ class Printer(BaseModel):
 
     id: int
     name: str
+    model: str | None = None
     state: PrinterState
     progress: float | None = Field(default=None, ge=0, le=100)
     remaining_seconds: int | None = None
@@ -135,6 +201,7 @@ class Printer(BaseModel):
     bed_target: float | None = None
     current_file: str | None = None
     camera_available: bool = False
+    cameras: list[str] = []  # URLs de snapshot (solo admin; BE-08/BE-21)
     loaded_spool: SpoolRef | None = None
     current_order: OrderRef | None = None
     last_seen: datetime | None = None
@@ -215,6 +282,7 @@ class PrintJob(BaseModel):
     grams_real: float | None = None
     minutes_real: int | None = None
     failure_reason: str | None = None
+    current_file: str | None = None
 
 
 class PrintJobStartRequest(BaseModel):
@@ -226,7 +294,50 @@ class PrintJobFailRequest(BaseModel):
     reason: str
 
 
+class PrinterCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    model: str | None = Field(default=None, max_length=80)
+    octoprint_url: str | None = None
+    api_key: str | None = None
+    bed_width: float | None = None
+    bed_depth: float | None = None
+    camera_available: bool = False
+    cameras: list[str] | None = None  # URLs de snapshot (BE-07)
+
+
+class PrinterUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    model: str | None = Field(default=None, max_length=80)
+    octoprint_url: str | None = None
+    api_key: str | None = None
+    bed_width: float | None = None
+    bed_depth: float | None = None
+    camera_available: bool | None = None
+    cameras: list[str] | None = None
+    state: PrinterState | None = None
+
+
+class PrinterConnectionTestRequest(BaseModel):
+    """BE-01: prueba antes del alta (URL + key en el body)."""
+
+    octoprint_url: str = Field(min_length=1, max_length=300)
+    api_key: str | None = None
+
+
+class PrinterConnectionTest(BaseModel):
+    ok: bool
+    message: str
+    version: str | None = None
+
+
 # --- clientes / productos --------------------------------------------------
+class CustomerCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    phone: str | None = None
+    email: str | None = None
+    notes: str | None = None
+
+
 class Customer(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

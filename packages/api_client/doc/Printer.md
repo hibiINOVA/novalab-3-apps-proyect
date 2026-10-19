@@ -11,6 +11,7 @@ Name | Type | Description | Notes
 **id** | **int** |  | 
 **name** | **String** |  | 
 **state** | [**PrinterState**](PrinterState.md) |  | 
+**model** | **String** |  | [optional] 
 **progress** | **double** |  | [optional] 
 **remainingSeconds** | **int** |  | [optional] 
 **nozzleTemp** | **double** |  | [optional] 
@@ -19,6 +20,7 @@ Name | Type | Description | Notes
 **bedTarget** | **double** |  | [optional] 
 **currentFile** | **String** |  | [optional] 
 **cameraAvailable** | **bool** |  | [optional] [default to false]
+**cameras** | **BuiltList&lt;String&gt;** | URLs de snapshot por cámara (solo admin; BE-08/BE-21). | [optional] 
 **loadedSpool** | [**SpoolRef**](SpoolRef.md) |  | [optional] 
 **currentOrder** | [**OrderRef**](OrderRef.md) |  | [optional] 
 **lastSeen** | [**DateTime**](DateTime.md) |  | [optional] 

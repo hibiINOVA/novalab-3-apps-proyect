@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,9 @@ class _CreateOrganizationScreenState
     extends ConsumerState<CreateOrganizationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _visionController = TextEditingController();
+  final _missionController = TextEditingController();
   bool _loading = false;
   String? _error;
   Organization? _createdOrg;
@@ -29,7 +33,15 @@ class _CreateOrganizationScreenState
   @override
   void dispose() {
     _nameController.dispose();
+    _descriptionController.dispose();
+    _visionController.dispose();
+    _missionController.dispose();
     super.dispose();
+  }
+
+  String? _trimmed(TextEditingController controller) {
+    final value = controller.text.trim();
+    return value.isEmpty ? null : value;
   }
 
   Future<void> _submit() async {
@@ -43,7 +55,12 @@ class _CreateOrganizationScreenState
       final name = _nameController.text.trim();
       final org = await ref
           .read(organizationStatusProvider.notifier)
-          .createOrganization(name);
+          .createOrganization(
+            name,
+            description: _trimmed(_descriptionController),
+            vision: _trimmed(_visionController),
+            mission: _trimmed(_missionController),
+          );
 
       if (!mounted) return;
       if (org != null) {
@@ -63,6 +80,36 @@ class _CreateOrganizationScreenState
         _loading = false;
         _error = 'Error al crear la organización. Intenta de nuevo.';
       });
+    }
+  }
+
+  Future<void> _pickLogo(Organization org) async {
+    try {
+      final picked = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const <String>['png', 'jpg', 'jpeg', 'webp'],
+      );
+      if (picked.isEmpty) return;
+      final file = picked.single;
+      final bytes = await file.readAsBytes();
+      final name = file.name;
+      final ok = await ref
+          .read(organizationStatusProvider.notifier)
+          .uploadLogo(bytes: bytes, filename: name);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok ? AppStrings.orgLogoUpdated : AppStrings.orgLogoError,
+          ),
+          backgroundColor: ok ? DesignTokens.neonGreen : null,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text(AppStrings.orgLogoError)));
     }
   }
 
@@ -186,6 +233,42 @@ class _CreateOrganizationScreenState
             },
             onFieldSubmitted: (_) => _submit(),
           ),
+          const SizedBox(height: DesignTokens.spaceMd),
+          TextFormField(
+            controller: _descriptionController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: AppStrings.orgDescriptionLabel,
+              hintText: AppStrings.orgDescriptionHint,
+              prefixIcon: Icon(Icons.notes_outlined),
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spaceMd),
+          TextFormField(
+            controller: _visionController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: AppStrings.orgVisionLabel,
+              hintText: AppStrings.orgVisionHint,
+              prefixIcon: Icon(Icons.visibility_outlined),
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spaceMd),
+          TextFormField(
+            controller: _missionController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: AppStrings.orgMissionLabel,
+              hintText: AppStrings.orgMissionHint,
+              prefixIcon: Icon(Icons.flag_outlined),
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+          ),
           const SizedBox(height: DesignTokens.spaceLg),
           FilledButton(
             onPressed: _loading ? null : _submit,
@@ -271,6 +354,20 @@ class _CreateOrganizationScreenState
           ),
         ),
         const SizedBox(height: DesignTokens.spaceXl),
+        OutlinedButton.icon(
+          onPressed: () => _pickLogo(org),
+          icon: const Icon(Icons.image_outlined),
+          label: const Text(AppStrings.orgUploadLogo),
+        ),
+        const SizedBox(height: DesignTokens.spaceSm),
+        Text(
+          AppStrings.orgLogoHint,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: DesignTokens.spaceMd),
         FilledButton.icon(
           onPressed: () => context.go('/'),
           icon: const Icon(Icons.arrow_forward),

@@ -27,6 +27,8 @@ class _$PrintJob extends PrintJob {
   final int? minutesReal;
   @override
   final String? failureReason;
+  @override
+  final String? currentFile;
 
   factory _$PrintJob([void Function(PrintJobBuilder)? updates]) =>
       (PrintJobBuilder()..update(updates))._build();
@@ -41,7 +43,8 @@ class _$PrintJob extends PrintJob {
       this.finishedAt,
       this.gramsReal,
       this.minutesReal,
-      this.failureReason})
+      this.failureReason,
+      this.currentFile})
       : super._();
   @override
   PrintJob rebuild(void Function(PrintJobBuilder) updates) =>
@@ -63,7 +66,8 @@ class _$PrintJob extends PrintJob {
         finishedAt == other.finishedAt &&
         gramsReal == other.gramsReal &&
         minutesReal == other.minutesReal &&
-        failureReason == other.failureReason;
+        failureReason == other.failureReason &&
+        currentFile == other.currentFile;
   }
 
   @override
@@ -79,6 +83,7 @@ class _$PrintJob extends PrintJob {
     _$hash = $jc(_$hash, gramsReal.hashCode);
     _$hash = $jc(_$hash, minutesReal.hashCode);
     _$hash = $jc(_$hash, failureReason.hashCode);
+    _$hash = $jc(_$hash, currentFile.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -95,7 +100,8 @@ class _$PrintJob extends PrintJob {
           ..add('finishedAt', finishedAt)
           ..add('gramsReal', gramsReal)
           ..add('minutesReal', minutesReal)
-          ..add('failureReason', failureReason))
+          ..add('failureReason', failureReason)
+          ..add('currentFile', currentFile))
         .toString();
   }
 }
@@ -144,6 +150,10 @@ class PrintJobBuilder implements Builder<PrintJob, PrintJobBuilder> {
   set failureReason(String? failureReason) =>
       _$this._failureReason = failureReason;
 
+  String? _currentFile;
+  String? get currentFile => _$this._currentFile;
+  set currentFile(String? currentFile) => _$this._currentFile = currentFile;
+
   PrintJobBuilder() {
     PrintJob._defaults(this);
   }
@@ -161,6 +171,7 @@ class PrintJobBuilder implements Builder<PrintJob, PrintJobBuilder> {
       _gramsReal = $v.gramsReal;
       _minutesReal = $v.minutesReal;
       _failureReason = $v.failureReason;
+      _currentFile = $v.currentFile;
       _$v = null;
     }
     return this;
@@ -195,6 +206,7 @@ class PrintJobBuilder implements Builder<PrintJob, PrintJobBuilder> {
           gramsReal: gramsReal,
           minutesReal: minutesReal,
           failureReason: failureReason,
+          currentFile: currentFile,
         );
     replace(_$result);
     return _$result;

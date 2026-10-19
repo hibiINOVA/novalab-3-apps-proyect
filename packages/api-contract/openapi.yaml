@@ -243,6 +243,33 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+    patch:
+      tags: [organizations]
+      operationId: updateOrganization
+      summary: Actualiza los datos de la organización (Dueño)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationUpdateRequest'
+      responses:
+        '200':
+          description: Organización actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: El usuario no pertenece a ninguna organización
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /api/organizations/current:
     get:
@@ -258,6 +285,89 @@ paths:
                 $ref: '#/components/schemas/UserOrganizationStatus'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /api/organizations/members:
+    get:
+      tags: [organizations]
+      operationId: listOrganizationMembers
+      summary: Lista los miembros activos de la organización (Dueño)
+      responses:
+        '200':
+          description: Miembros activos (dueño y operadores)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrganizationMember'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/organizations/logo:
+    post:
+      tags: [organizations]
+      operationId: uploadOrganizationLogo
+      summary: Sube el logo de la organización (Dueño)
+      description: Imagen png/jpeg/webp de máximo 5 MB.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Logo guardado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          description: Imagen demasiado grande
+        '415':
+          description: Formato no soportado (usa png, jpeg o webp)
+    get:
+      tags: [organizations]
+      operationId: downloadOrganizationLogo
+      summary: Descarga el logo de la organización (miembro autenticado)
+      responses:
+        '200':
+          description: Imagen del logo
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: La organización no tiene logo
+    delete:
+      tags: [organizations]
+      operationId: deleteOrganizationLogo
+      summary: Elimina el logo de la organización (Dueño)
+      responses:
+        '200':
+          description: Logo eliminado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /api/organizations/join:
     post:
@@ -377,6 +487,125 @@ paths:
                   $ref: '#/components/schemas/Printer'
         '401':
           $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [printers]
+      operationId: createPrinter
+      summary: Registra una nueva impresora en el taller
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrinterCreateRequest'
+      responses:
+        '201':
+          description: Impresora registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Printer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Datos inválidos
+
+  /api/printers/test:
+    post:
+      tags: [printers]
+      operationId: testPrinterConnection
+      summary: Prueba la conexión a OctoPrint con URL y API key (BE-01)
+      description: >-
+        Valida URL + API key contra `/api/version` de OctoPrint antes de
+        dar de alta la impresora. No guarda nada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrinterConnectionTestRequest'
+      responses:
+        '200':
+          description: Resultado de la prueba (ok o error alcanzable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrinterConnectionTest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/printers/{printerId}/test:
+    post:
+      tags: [printers]
+      operationId: testPrinterConnectionById
+      summary: Prueba la conexión guardada de una impresora (BE-01)
+      parameters:
+        - $ref: '#/components/parameters/PrinterId'
+      responses:
+        '200':
+          description: Resultado de la prueba
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrinterConnectionTest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Impresora sin URL de OctoPrint configurada
+
+  /api/printers/{printerId}:
+    get:
+      tags: [printers]
+      operationId: getPrinter
+      summary: Detalle de una impresora
+      parameters:
+        - $ref: '#/components/parameters/PrinterId'
+      responses:
+        '200':
+          description: Impresora
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Printer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Impresora no encontrada
+    patch:
+      tags: [printers]
+      operationId: updatePrinter
+      summary: Actualiza configuración o estado de la impresora
+      parameters:
+        - $ref: '#/components/parameters/PrinterId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrinterUpdateRequest'
+      responses:
+        '200':
+          description: Impresora actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Printer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Impresora no encontrada
+    delete:
+      tags: [printers]
+      operationId: deletePrinter
+      summary: Elimina una impresora del taller
+      parameters:
+        - $ref: '#/components/parameters/PrinterId'
+      responses:
+        '204':
+          description: Impresora eliminada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Impresora no encontrada
 
   /api/printers/{printerId}/camera/snapshot:
     get:
@@ -385,7 +614,8 @@ paths:
       summary: Última miniatura de cámara de la impresora (servida por el backend)
       description: >-
         Devuelve la última instantánea guardada por el backend (BE-07/08). El
-        cliente nunca accede al stream ni a la IP de la impresora.
+        cliente nunca accede al stream ni a la IP de la impresora. `index`
+        selecciona la cámara (0 = principal).
       parameters:
         - name: printerId
           in: path
@@ -393,6 +623,13 @@ paths:
           schema:
             type: integer
             format: int64
+        - name: index
+          in: query
+          required: false
+          description: Índice de cámara (0 = principal).
+          schema:
+            type: integer
+            default: 0
       responses:
         '200':
           description: Instantánea en PNG
@@ -513,6 +750,68 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '409':
           description: La impresora no está disponible
+
+  /api/print-jobs/{jobId}/gcode:
+    post:
+      tags: [print-jobs]
+      operationId: uploadPrintJobGcode
+      summary: Sube el archivo G-code asociado a un job (BE-05)
+      description: >-
+        Guarda el archivo .gcode/.gco/.g del job en el servidor (máx. 50 MB).
+        Si la impresora tiene OctoPrint configurado, el backend lo envía e
+        inicia físicamente (BE-05/BE-06; solo tras la confirmación explícita
+        del operador en el start del job). Si el envío falla responde 502 y
+        el job queda en `failed`.
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Job actualizado con el archivo asociado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrintJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Job no encontrado
+        '413':
+          description: Archivo demasiado grande
+        '415':
+          description: Extensión no soportada (usa .gcode, .gco o .g)
+        '502':
+          description: >-
+            OctoPrint rechazó el envío; el job quedó en `failed`
+            (código `octoprint_error`).
+    get:
+      tags: [print-jobs]
+      operationId: downloadPrintJobGcode
+      summary: Descarga el archivo G-code asociado a un job
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Contenido del archivo G-code
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Job sin archivo G-code o no encontrado
 
   /api/print-jobs/{jobId}/complete:
     post:
@@ -695,6 +994,44 @@ paths:
                   $ref: '#/components/schemas/Customer'
         '401':
           $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [customers]
+      operationId: createCustomer
+      summary: Registra un nuevo cliente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerCreateRequest'
+      responses:
+        '201':
+          description: Cliente creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/customers/{customerId}:
+    get:
+      tags: [customers]
+      operationId: getCustomer
+      summary: Detalle de un cliente por su ID
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Cliente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Cliente no encontrado
 
   /api/products:
     get:
@@ -772,6 +1109,20 @@ components:
       schema:
         type: integer
         format: int64
+    PrinterId:
+      name: printerId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    CustomerId:
+      name: customerId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
 
   schemas:
     Error:
@@ -827,6 +1178,18 @@ components:
           description: ID único de la organización para compartir con operadores (p. ej. ORG-NOVA-8492)
         name:
           type: string
+        description:
+          type: string
+          nullable: true
+        vision:
+          type: string
+          nullable: true
+        mission:
+          type: string
+          nullable: true
+        has_logo:
+          type: boolean
+          default: false
         owner_id:
           type: integer
           format: int64
@@ -842,6 +1205,38 @@ components:
         name:
           type: string
           minLength: 2
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+        vision:
+          type: string
+          maxLength: 2000
+          nullable: true
+        mission:
+          type: string
+          maxLength: 2000
+          nullable: true
+
+    OrganizationUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          nullable: true
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+        vision:
+          type: string
+          maxLength: 2000
+          nullable: true
+        mission:
+          type: string
+          maxLength: 2000
+          nullable: true
 
     JoinOrganizationRequest:
       type: object
@@ -1004,6 +1399,110 @@ components:
           format: date
           nullable: true
 
+    PrinterCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        model:
+          type: string
+          description: Modelo comercial de la impresora (p. ej. Prusa MK4)
+          maxLength: 80
+          nullable: true
+        octoprint_url:
+          type: string
+          nullable: true
+        api_key:
+          type: string
+          nullable: true
+        bed_width:
+          type: number
+          format: float
+          nullable: true
+        bed_depth:
+          type: number
+          format: float
+          nullable: true
+        camera_available:
+          type: boolean
+          default: false
+        cameras:
+          type: array
+          description: >-
+            URLs de snapshot por cámara (BE-07). La primera es la principal.
+            El backend las consume; jamás se exponen al cliente público.
+          items:
+            type: string
+          nullable: true
+
+    PrinterUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          nullable: true
+        model:
+          type: string
+          maxLength: 80
+          nullable: true
+        octoprint_url:
+          type: string
+          nullable: true
+        api_key:
+          type: string
+          nullable: true
+        bed_width:
+          type: number
+          format: float
+          nullable: true
+        bed_depth:
+          type: number
+          format: float
+          nullable: true
+        camera_available:
+          type: boolean
+          nullable: true
+        cameras:
+          type: array
+          description: URLs de snapshot por cámara (BE-07); reemplaza la lista.
+          items:
+            type: string
+          nullable: true
+        state:
+          $ref: '#/components/schemas/PrinterState'
+          nullable: true
+
+    PrinterConnectionTestRequest:
+      type: object
+      required: [octoprint_url]
+      description: 'BE-01: prueba de conexión antes del alta de la impresora.'
+      properties:
+        octoprint_url:
+          type: string
+          minLength: 1
+          maxLength: 300
+        api_key:
+          type: string
+          nullable: true
+
+    PrinterConnectionTest:
+      type: object
+      required: [ok, message]
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: string
+        version:
+          type: string
+          description: Versión del servidor OctoPrint si la conexión fue ok.
+          nullable: true
+
     Printer:
       type: object
       required: [id, name, state]
@@ -1013,6 +1512,9 @@ components:
           format: int64
         name:
           type: string
+        model:
+          type: string
+          nullable: true
         state:
           $ref: '#/components/schemas/PrinterState'
         progress:
@@ -1046,6 +1548,11 @@ components:
         camera_available:
           type: boolean
           default: false
+        cameras:
+          type: array
+          description: URLs de snapshot por cámara (solo admin; BE-08/BE-21).
+          items:
+            type: string
         loaded_spool:
           allOf:
             - $ref: '#/components/schemas/SpoolRef'
@@ -1160,6 +1667,25 @@ components:
       type: string
       description: Derivado de la fecha prometida; alimenta las alertas visuales (P-07)
       enum: [none, ok, due_soon, overdue]
+
+    CustomerCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        notes:
+          type: string
+          nullable: true
 
     Customer:
       type: object
@@ -1492,6 +2018,10 @@ components:
           nullable: true
         failure_reason:
           type: string
+          nullable: true
+        current_file:
+          type: string
+          description: Nombre del archivo G-code asociado al job (si se subió)
           nullable: true
 
     PublicLookupRequest:

@@ -1,6 +1,8 @@
 """Modelos SQLAlchemy. Mapean 1:1 a los `components/schemas` del contrato.
 
-Single-tenant: no existe `org_id` (un negocio por instalación, doc §2).
+Organizaciones (contrato `/api/organizations*`): cada usuario puede
+pertenecer a una organización; los recursos operativos siguen siendo del
+negocio instalación (no hay `org_id` en printers/orders/queue).
 """
 
 from datetime import UTC, date, datetime
@@ -32,7 +34,67 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20))  # owner | operator (BE-17)
+    # use_alter: dependencia circular users↔organizations; en SQLite el
+    # constraint se omite (no se enforcea) y en Alembic ya existe el orden.
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", use_alter=True),
+        nullable=True,
+        index=True,
+    )
+    membership_status: Mapped[str] = mapped_column(
+        String(20), default="none"
+    )  # none | pending | active | rejected
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    organization: Mapped["Organization | None"] = relationship(
+        "Organization", foreign_keys=[organization_id]
+    )
+
+    @property
+    def organization_code(self) -> str | None:
+        """Derivado del contrato (`User.organization_code`)."""
+        return self.organization.code if self.organization is not None else None
+
+
+class Organization(Base):
+    """Organización del negocio (contrato `Organization`)."""
+
+    __tablename__ = "organizations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    vision: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mission: Mapped[str | None] = mapped_column(Text, nullable=True)
+    logo_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    @property
+    def has_logo(self) -> bool:
+        return self.logo_path is not None
+
+
+class OrganizationMember(Base):
+    """Membresía/solicitud de usuario en una organización (`OrganizationMember`)."""
+
+    __tablename__ = "organization_members"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending"
+    )  # pending | active | rejected
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    user: Mapped[User] = relationship("User", foreign_keys=[user_id])
+    organization: Mapped[Organization] = relationship(
+        "Organization", foreign_keys=[organization_id]
+    )
 
 
 class Business(Base):
@@ -78,9 +140,12 @@ class Printer(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
+    model: Mapped[str | None] = mapped_column(String(80), nullable=True)
     octoprint_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
     api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     snapshot_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # JSON array de URLs de snapshot (BE-07, multi-cámara); la 0 es principal.
+    camera_urls: Mapped[str | None] = mapped_column(Text, nullable=True)
     bed_width: Mapped[float | None] = mapped_column(Float, nullable=True)
     bed_depth: Mapped[float | None] = mapped_column(Float, nullable=True)
     state: Mapped[str] = mapped_column(String(20), default="idle")
@@ -209,6 +274,7 @@ class PrintJob(Base):
     grams_real: Mapped[float | None] = mapped_column(Float, nullable=True)
     minutes_real: Mapped[int | None] = mapped_column(Integer, nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    current_file: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     item: Mapped[OrderItem] = relationship("OrderItem")
     printer: Mapped[Printer] = relationship("Printer")

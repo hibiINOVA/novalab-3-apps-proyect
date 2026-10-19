@@ -1,24 +1,55 @@
-"""JWT (access/refresh) y hash de contraseñas (PBKDF2, stdlib).
+"""JWT (access/refresh), hash de contraseñas (PBKDF2) y cifrado de secrets.
 
 BE-17: roles owner/operator viajan en el token y se validan en deps.
+BE-20: API keys de OctoPrint cifradas en reposo (Fernet, key derivada).
 """
 
+import base64
 import hashlib
 import hmac
-import os
 import secrets
 from datetime import UTC, datetime, timedelta
 
 import jwt
+from cryptography.fernet import Fernet, InvalidToken
 
 from app.config import settings
 
 ALGORITHM = "HS256"
 _PBKDF2_ITERATIONS = 390_000
+_FERNET_PREFIX = "fernet:"
 
 
 def _secret() -> str:
     return settings.jwt_secret or "novalab-dev-secret-change-me"
+
+
+def _fernet() -> Fernet:
+    """BE-20: clave Fernet derivada de secret_key (o jwt_secret en dev)."""
+    seed = settings.secret_key or _secret()
+    digest = hashlib.sha256(seed.encode()).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def encrypt_secret(plain: str | None) -> str | None:
+    """Cifra para almacenar. None/vacío pasa tal cual."""
+    if not plain:
+        return plain
+    return _FERNET_PREFIX + _fernet().encrypt(plain.encode()).decode()
+
+
+def decrypt_secret(stored: str | None) -> str | None:
+    """Descifra un valor almacenado. Tolera plaintext heredado (dev/demo)."""
+    if not stored:
+        return stored
+    if not stored.startswith(_FERNET_PREFIX):
+        return stored  # legado sin cifrar (seed/demo)
+    try:
+        return _fernet().decrypt(
+            stored[len(_FERNET_PREFIX):].encode()
+        ).decode()
+    except InvalidToken:
+        return None  # key distinta o dato corrupto
 
 
 def hash_password(password: str) -> str:

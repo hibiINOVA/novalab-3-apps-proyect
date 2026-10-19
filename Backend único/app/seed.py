@@ -56,19 +56,22 @@ def seed_demo(db: Session) -> None:
     db.flush()
 
     # --- impresoras (BE-01..BE-03) ---
-    p1 = Printer(name="Prusa MK4", octoprint_url="http://192.168.1.40",
+    p1 = Printer(name="Prusa MK4", model="Prusa MK4",
+                 octoprint_url="http://192.168.1.40",
                  snapshot_url=None, bed_width=250, bed_depth=210,
                  state="idle", camera_available=True,
                  loaded_spool_id=spool_petg_blue.id,
                  nozzle_temp=24.0, nozzle_target=0.0, bed_temp=23.0,
                  bed_target=0.0, last_seen=datetime.now(UTC))
-    p2 = Printer(name="Ender 3 V3", octoprint_url="http://192.168.1.41",
+    p2 = Printer(name="Ender 3 V3", model="Creality Ender 3 V3",
+                 octoprint_url="http://192.168.1.41",
                  snapshot_url=None, bed_width=220, bed_depth=220,
                  state="idle", camera_available=True,
                  loaded_spool_id=spool_petg_black.id,
                  nozzle_temp=22.0, nozzle_target=0.0, bed_temp=22.0,
                  bed_target=0.0, last_seen=datetime.now(UTC))
-    p3 = Printer(name="Bambu Lab A1", octoprint_url=None,
+    p3 = Printer(name="Bambu Lab A1", model="Bambu Lab A1",
+                 octoprint_url=None,
                  snapshot_url=None, bed_width=256, bed_depth=256,
                  state="offline", camera_available=False,
                  loaded_spool_id=spool_pla_white.id, last_seen=None)

@@ -18,6 +18,7 @@ Name | Type | Description | Notes
 **gramsReal** | **double** |  | [optional] 
 **minutesReal** | **int** |  | [optional] 
 **failureReason** | **String** |  | [optional] 
+**currentFile** | **String** | Nombre del archivo G-code asociado al job (si se subió) | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

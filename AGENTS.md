@@ -8,18 +8,19 @@
 
 ## Repo state
 
-- Monorepo reorganized by folders: `Producción/`, `Seguimiento del cliente/` (planned), `Finanzas/` (planned), `Backend único/`, `packages/`, `deploy/` (planned), `docs/` (planned).
-- `Producción/` (Flutter) vertical slice: **P-01..P-03**. `Backend único/` (FastAPI) implements all contract endpoints + seed demo.
+- Monorepo by folders: `Producción/`, `Seguimiento del cliente/` (planned), `Finanzas/` (planned), `Backend único/`, `packages/`, `deploy/` (planned), `docs/` (planned).
+- `Producción/` (Flutter): **P-01..P-04** + orders + organizations. `Backend único/` (FastAPI) implements all contract endpoints + seed demo.
 - `Producción/` runs against mocks by default (`USE_MOCKS=true`); point `API_BASE_URL` at backend to go live.
 - No CI yet. Generated Dart client is in `packages/api_client` (do not edit manually).
 - `Producción/lib/src/api/openapi_config.dart` uses `@Openapi(forceAlwaysRun: true)` because spec lives outside the package.
+- **`Producción/README.md` is stale** (claims backend doesn't exist, workdir `apps/produccion`). Trust this file and the code, not that README.
 
 ## Entry points & boundaries
 
-- **Producción/** (`apps/produccion` renamed): Flutter (web/tablet/desktop). Auth (P-01), printers dashboard (P-02), queue (P-03). Uses Riverpod + go_router.
+- **Producción/**: Flutter (web/tablet/desktop), `lib/core/` (api/branding/config/i18n/realtime/router/theme) + `lib/features/` (auth P-01, printers P-02, queue P-03, orders, organization, dashboard shell). Riverpod + go_router. Mock backend: `lib/core/api/mock/mock_backend.dart`.
 - **packages/api-contract/openapi.yaml**: single OpenAPI contract; generates `packages/api_client` (Dart/dio, pubName `novalab_api`).
-- **packages/api_client**: generated output — never edit. Regenerate from contract.
-- **Backend único/**: FastAPI + SQLite + Alembic. Business logic, state machines, queue rules, and **all finance formulas** live only there.
+- **packages/api_client**: generated output — never edit. Regenerate from contract (Java 21 required, only for this).
+- **Backend único/**: FastAPI + SQLite + Alembic. Business logic, state machines, queue rules, and **all finance formulas** live only there. Routers: auth, catalog, orders, organizations, printers, print_jobs, public, queue, ws.
 - **Seguimiento del cliente/** (planned): SvelteKit static (public, anonymous — only sees own `tracking_token`). **Must not** expose costs/profits/other clients/internal IPs (public tracking app).
 - **Finanzas/** (planned): React + Vite + TS (private). Finance calculations come from backend.
 - **deploy/** (planned): docker-compose, Caddyfile, install.sh.
@@ -44,11 +45,13 @@ Run backend commands from `Backend único/` (workdir):
 ```bash
 source .venv/bin/activate       # venv (already created)
 uvicorn app.main:app --port 8081   # dev server (auto-creates tables + seed)
-python -m pytest tests/ -q      # 17 tests
+python -m pytest tests/ -q      # 38 tests
 alembic upgrade head            # apply migrations (fresh DBs only)
 ```
 
 Env/config via `--dart-define`: `API_BASE_URL`, `USE_MOCKS` (defaults `true`).
+
+Backend env vars use prefix `NOVALAB_` (see `app/config.py`), e.g. `NOVALAB_DB_URL`, `NOVALAB_SEED_DEMO`.
 
 Demo creds (mock + backend seed, password `novalab`): `dueno@novalab.mx` (owner), `operador@novalab.mx` (operator).
 
@@ -59,15 +62,15 @@ Demo creds (mock + backend seed, password `novalab`): `dueno@novalab.mx` (owner)
 - **Two-port topology** (planned): public serves only `Seguimiento del cliente/` + `/api/public/*`; private (LAN/VPN/Cloudflare Access) serves `Producción/` (`/admin`), `Finanzas/` (`/finanzas`), full `/api` + WebSocket.
 - Public API never exposes costs, profits, other clients, or internal IPs (BE-21, BE-22). Client is anonymous, only sees own `tracking_token`.
 - Never auto-start prints: sending G-code requires explicit operator confirmation (BE-05, P-05).
-- Single-tenant: one business per install; no `org_id`.
+- Single-tenant operativo: printers/orders/queue/costos no llevan `org_id` (un negocio por instalación). Las **organizaciones** (`/api/organizations*`) solo gestionan membresías owner/operador; no aíslan datos del negocio.
 - Camera served via backend snapshot only (no raw stream/IP exposure) (BE-08).
 - Defaults: `es-MX`, texts externalized, currency/timezone configurable (doc §3.12, §7). Branding from `GET /api/public/branding`.
 
 ## Testing notes
 
-- `flutter test` in `Producción/` covers auth/session, live dashboard (controlled WS), queue drag/reorder, es-MX formatting, responsive nav.
+- `flutter test` in `Producción/` covers auth/session, live dashboard (controlled WS), queue drag/reorder, suggestion dialog, organization flow, es-MX formatting, responsive nav.
 - Mock latency disabled in tests via `mockLatencyProvider`.
-- `python -m pytest tests/` in `Backend único/` covers auth, queue version 409, jobs lifecycle, orders/status, public track/lookup, finance formulas, WS hello.
+- `python -m pytest tests/` in `Backend único/` covers auth, queue version 409, jobs lifecycle, orders/status, public track/lookup, finance formulas, WS hello, organizations (create/join/approve/reject/update/members/logo), printer CRUD, customers, gcode upload.
 
 ## Conventions
 

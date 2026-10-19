@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novalab_api/novalab_api.dart';
 
 import '../../../core/i18n/app_strings.dart';
 import '../../../core/theme/design_tokens.dart';
+import '../printers_providers.dart';
 import 'printer_camera.dart';
+import 'printer_form_dialog.dart';
 import 'printer_state_view.dart';
 
 /// Tarjeta de una impresora en el tablero (P-02).
@@ -41,6 +44,8 @@ class PrinterCard extends StatelessWidget {
                 PrinterCamera(
                   printerId: printer.id,
                   available: printer.cameraAvailable ?? false,
+                  cameras: printer.cameras?.toList() ?? const <String>[],
+                  printing: printer.state == PrinterState.printing,
                 ),
                 const SizedBox(height: DesignTokens.spaceSm),
                 if (printer.state == PrinterState.printing ||
@@ -57,27 +62,115 @@ class PrinterCard extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
+class _Header extends ConsumerWidget {
   const _Header({required this.printer, required this.stateView});
 
   final Printer printer;
   final PrinterStateView stateView;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Row(
       children: <Widget>[
         Expanded(
-          child: Text(
-            printer.name,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            overflow: TextOverflow.ellipsis,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                printer.name,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (printer.model != null && printer.model!.isNotEmpty)
+                Text(
+                  printer.model!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
           ),
         ),
         const SizedBox(width: DesignTokens.spaceSm),
         _StateChip(stateView: stateView),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, size: 20),
+          tooltip: 'Opciones de impresora',
+          onSelected: (action) async {
+            if (action == 'edit') {
+              await PrinterFormDialog.show(context, printer: printer);
+            } else if (action == 'delete') {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text(AppStrings.printerDelete),
+                  content: const Text(AppStrings.printerDeleteConfirm),
+                  actions: <Widget>[
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text(AppStrings.cancel),
+                    ),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: DesignTokens.danger,
+                      ),
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text(AppStrings.delete),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                final ok = await ref
+                    .read(printersProvider.notifier)
+                    .deletePrinter(printer.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        ok
+                            ? AppStrings.printerDeleted
+                            : AppStrings.printerErrorDelete,
+                      ),
+                    ),
+                  );
+                }
+              }
+            }
+          },
+          itemBuilder: (_) => const <PopupMenuEntry<String>>[
+            PopupMenuItem<String>(
+              value: 'edit',
+              child: Row(
+                children: <Widget>[
+                  Icon(Icons.edit_outlined, size: 18),
+                  SizedBox(width: DesignTokens.spaceSm),
+                  Text(AppStrings.printerEdit),
+                ],
+              ),
+            ),
+            PopupMenuItem<String>(
+              value: 'delete',
+              child: Row(
+                children: <Widget>[
+                  Icon(
+                    Icons.delete_outline,
+                    size: 18,
+                    color: DesignTokens.danger,
+                  ),
+                  SizedBox(width: DesignTokens.spaceSm),
+                  Text(
+                    AppStrings.printerDelete,
+                    style: TextStyle(color: DesignTokens.danger),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }

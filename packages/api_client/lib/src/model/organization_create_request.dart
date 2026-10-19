@@ -12,12 +12,24 @@ part 'organization_create_request.g.dart';
 ///
 /// Properties:
 /// * [name]
+/// * [description]
+/// * [vision]
+/// * [mission]
 @BuiltValue()
 abstract class OrganizationCreateRequest
     implements
         Built<OrganizationCreateRequest, OrganizationCreateRequestBuilder> {
   @BuiltValueField(wireName: r'name')
   String get name;
+
+  @BuiltValueField(wireName: r'description')
+  String? get description;
+
+  @BuiltValueField(wireName: r'vision')
+  String? get vision;
+
+  @BuiltValueField(wireName: r'mission')
+  String? get mission;
 
   OrganizationCreateRequest._();
 
@@ -54,6 +66,27 @@ class _$OrganizationCreateRequestSerializer
       object.name,
       specifiedType: const FullType(String),
     );
+    if (object.description != null) {
+      yield r'description';
+      yield serializers.serialize(
+        object.description,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
+    if (object.vision != null) {
+      yield r'vision';
+      yield serializers.serialize(
+        object.vision,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
+    if (object.mission != null) {
+      yield r'mission';
+      yield serializers.serialize(
+        object.mission,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
   }
 
   @override
@@ -85,6 +118,30 @@ class _$OrganizationCreateRequestSerializer
             specifiedType: const FullType(String),
           ) as String;
           result.name = valueDes;
+          break;
+        case r'description':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.description = valueDes;
+          break;
+        case r'vision':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.vision = valueDes;
+          break;
+        case r'mission':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.mission = valueDes;
           break;
         default:
           unhandled.add(key);

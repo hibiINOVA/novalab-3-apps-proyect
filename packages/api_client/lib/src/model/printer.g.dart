@@ -14,6 +14,8 @@ class _$Printer extends Printer {
   @override
   final PrinterState state;
   @override
+  final String? model;
+  @override
   final double? progress;
   @override
   final int? remainingSeconds;
@@ -30,6 +32,8 @@ class _$Printer extends Printer {
   @override
   final bool? cameraAvailable;
   @override
+  final BuiltList<String>? cameras;
+  @override
   final SpoolRef? loadedSpool;
   @override
   final OrderRef? currentOrder;
@@ -43,6 +47,7 @@ class _$Printer extends Printer {
       {required this.id,
       required this.name,
       required this.state,
+      this.model,
       this.progress,
       this.remainingSeconds,
       this.nozzleTemp,
@@ -51,6 +56,7 @@ class _$Printer extends Printer {
       this.bedTarget,
       this.currentFile,
       this.cameraAvailable,
+      this.cameras,
       this.loadedSpool,
       this.currentOrder,
       this.lastSeen})
@@ -69,6 +75,7 @@ class _$Printer extends Printer {
         id == other.id &&
         name == other.name &&
         state == other.state &&
+        model == other.model &&
         progress == other.progress &&
         remainingSeconds == other.remainingSeconds &&
         nozzleTemp == other.nozzleTemp &&
@@ -77,6 +84,7 @@ class _$Printer extends Printer {
         bedTarget == other.bedTarget &&
         currentFile == other.currentFile &&
         cameraAvailable == other.cameraAvailable &&
+        cameras == other.cameras &&
         loadedSpool == other.loadedSpool &&
         currentOrder == other.currentOrder &&
         lastSeen == other.lastSeen;
@@ -88,6 +96,7 @@ class _$Printer extends Printer {
     _$hash = $jc(_$hash, id.hashCode);
     _$hash = $jc(_$hash, name.hashCode);
     _$hash = $jc(_$hash, state.hashCode);
+    _$hash = $jc(_$hash, model.hashCode);
     _$hash = $jc(_$hash, progress.hashCode);
     _$hash = $jc(_$hash, remainingSeconds.hashCode);
     _$hash = $jc(_$hash, nozzleTemp.hashCode);
@@ -96,6 +105,7 @@ class _$Printer extends Printer {
     _$hash = $jc(_$hash, bedTarget.hashCode);
     _$hash = $jc(_$hash, currentFile.hashCode);
     _$hash = $jc(_$hash, cameraAvailable.hashCode);
+    _$hash = $jc(_$hash, cameras.hashCode);
     _$hash = $jc(_$hash, loadedSpool.hashCode);
     _$hash = $jc(_$hash, currentOrder.hashCode);
     _$hash = $jc(_$hash, lastSeen.hashCode);
@@ -109,6 +119,7 @@ class _$Printer extends Printer {
           ..add('id', id)
           ..add('name', name)
           ..add('state', state)
+          ..add('model', model)
           ..add('progress', progress)
           ..add('remainingSeconds', remainingSeconds)
           ..add('nozzleTemp', nozzleTemp)
@@ -117,6 +128,7 @@ class _$Printer extends Printer {
           ..add('bedTarget', bedTarget)
           ..add('currentFile', currentFile)
           ..add('cameraAvailable', cameraAvailable)
+          ..add('cameras', cameras)
           ..add('loadedSpool', loadedSpool)
           ..add('currentOrder', currentOrder)
           ..add('lastSeen', lastSeen))
@@ -138,6 +150,10 @@ class PrinterBuilder implements Builder<Printer, PrinterBuilder> {
   PrinterState? _state;
   PrinterState? get state => _$this._state;
   set state(PrinterState? state) => _$this._state = state;
+
+  String? _model;
+  String? get model => _$this._model;
+  set model(String? model) => _$this._model = model;
 
   double? _progress;
   double? get progress => _$this._progress;
@@ -173,6 +189,10 @@ class PrinterBuilder implements Builder<Printer, PrinterBuilder> {
   set cameraAvailable(bool? cameraAvailable) =>
       _$this._cameraAvailable = cameraAvailable;
 
+  ListBuilder<String>? _cameras;
+  ListBuilder<String> get cameras => _$this._cameras ??= ListBuilder<String>();
+  set cameras(ListBuilder<String>? cameras) => _$this._cameras = cameras;
+
   SpoolRefBuilder? _loadedSpool;
   SpoolRefBuilder get loadedSpool => _$this._loadedSpool ??= SpoolRefBuilder();
   set loadedSpool(SpoolRefBuilder? loadedSpool) =>
@@ -198,6 +218,7 @@ class PrinterBuilder implements Builder<Printer, PrinterBuilder> {
       _id = $v.id;
       _name = $v.name;
       _state = $v.state;
+      _model = $v.model;
       _progress = $v.progress;
       _remainingSeconds = $v.remainingSeconds;
       _nozzleTemp = $v.nozzleTemp;
@@ -206,6 +227,7 @@ class PrinterBuilder implements Builder<Printer, PrinterBuilder> {
       _bedTarget = $v.bedTarget;
       _currentFile = $v.currentFile;
       _cameraAvailable = $v.cameraAvailable;
+      _cameras = $v.cameras?.toBuilder();
       _loadedSpool = $v.loadedSpool?.toBuilder();
       _currentOrder = $v.currentOrder?.toBuilder();
       _lastSeen = $v.lastSeen;
@@ -237,6 +259,7 @@ class PrinterBuilder implements Builder<Printer, PrinterBuilder> {
                 BuiltValueNullFieldError.checkNotNull(name, r'Printer', 'name'),
             state: BuiltValueNullFieldError.checkNotNull(
                 state, r'Printer', 'state'),
+            model: model,
             progress: progress,
             remainingSeconds: remainingSeconds,
             nozzleTemp: nozzleTemp,
@@ -245,6 +268,7 @@ class PrinterBuilder implements Builder<Printer, PrinterBuilder> {
             bedTarget: bedTarget,
             currentFile: currentFile,
             cameraAvailable: cameraAvailable,
+            cameras: _cameras?.build(),
             loadedSpool: _loadedSpool?.build(),
             currentOrder: _currentOrder?.build(),
             lastSeen: lastSeen,
@@ -252,6 +276,8 @@ class PrinterBuilder implements Builder<Printer, PrinterBuilder> {
     } catch (_) {
       late String _$failedField;
       try {
+        _$failedField = 'cameras';
+        _cameras?.build();
         _$failedField = 'loadedSpool';
         _loadedSpool?.build();
         _$failedField = 'currentOrder';

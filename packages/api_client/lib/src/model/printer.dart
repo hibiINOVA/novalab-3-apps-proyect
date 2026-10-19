@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:novalab_api/src/model/spool_ref.dart';
 import 'package:novalab_api/src/model/printer_state.dart';
+import 'package:built_collection/built_collection.dart';
 import 'package:novalab_api/src/model/order_ref.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -17,6 +18,7 @@ part 'printer.g.dart';
 /// * [id]
 /// * [name]
 /// * [state]
+/// * [model]
 /// * [progress]
 /// * [remainingSeconds]
 /// * [nozzleTemp]
@@ -25,6 +27,7 @@ part 'printer.g.dart';
 /// * [bedTarget]
 /// * [currentFile]
 /// * [cameraAvailable]
+/// * [cameras] - URLs de snapshot por cámara (solo admin; BE-08/BE-21).
 /// * [loadedSpool]
 /// * [currentOrder]
 /// * [lastSeen]
@@ -39,6 +42,9 @@ abstract class Printer implements Built<Printer, PrinterBuilder> {
   @BuiltValueField(wireName: r'state')
   PrinterState get state;
   // enum stateEnum {  idle,  printing,  paused,  offline,  error,  };
+
+  @BuiltValueField(wireName: r'model')
+  String? get model;
 
   @BuiltValueField(wireName: r'progress')
   double? get progress;
@@ -63,6 +69,10 @@ abstract class Printer implements Built<Printer, PrinterBuilder> {
 
   @BuiltValueField(wireName: r'camera_available')
   bool? get cameraAvailable;
+
+  /// URLs de snapshot por cámara (solo admin; BE-08/BE-21).
+  @BuiltValueField(wireName: r'cameras')
+  BuiltList<String>? get cameras;
 
   @BuiltValueField(wireName: r'loaded_spool')
   SpoolRef? get loadedSpool;
@@ -111,6 +121,13 @@ class _$PrinterSerializer implements PrimitiveSerializer<Printer> {
       object.state,
       specifiedType: const FullType(PrinterState),
     );
+    if (object.model != null) {
+      yield r'model';
+      yield serializers.serialize(
+        object.model,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
     if (object.progress != null) {
       yield r'progress';
       yield serializers.serialize(
@@ -165,6 +182,13 @@ class _$PrinterSerializer implements PrimitiveSerializer<Printer> {
       yield serializers.serialize(
         object.cameraAvailable,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.cameras != null) {
+      yield r'cameras';
+      yield serializers.serialize(
+        object.cameras,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
       );
     }
     if (object.loadedSpool != null) {
@@ -234,6 +258,14 @@ class _$PrinterSerializer implements PrimitiveSerializer<Printer> {
           ) as PrinterState;
           result.state = valueDes;
           break;
+        case r'model':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.model = valueDes;
+          break;
         case r'progress':
           final valueDes = serializers.deserialize(
             value,
@@ -296,6 +328,13 @@ class _$PrinterSerializer implements PrimitiveSerializer<Printer> {
             specifiedType: const FullType(bool),
           ) as bool;
           result.cameraAvailable = valueDes;
+          break;
+        case r'cameras':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(String)]),
+          ) as BuiltList<String>;
+          result.cameras.replace(valueDes);
           break;
         case r'loaded_spool':
           final valueDes = serializers.deserialize(

@@ -4,8 +4,11 @@ import 'package:novalab_api/novalab_api.dart';
 
 import '../../../core/branding/branding_provider.dart';
 import '../../../core/i18n/app_strings.dart';
+import '../../../core/theme/design_tokens.dart';
 import '../../auth/auth_providers.dart';
 import '../../organization/organization_providers.dart';
+import '../../organization/presentation/edit_organization_dialog.dart';
+import '../../organization/presentation/organization_members_dialog.dart';
 import '../../organization/presentation/organization_requests_dialog.dart';
 import '../../printers/presentation/printers_tab.dart';
 import '../../queue/presentation/queue_tab.dart';
@@ -55,37 +58,67 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final orgStatus = ref.watch(organizationStatusProvider).value;
     final orgCode = orgStatus?.organization?.code ?? user?.organizationCode;
     final pendingCount = ref.watch(pendingRequestsProvider).value?.length ?? 0;
+    final logoBytes = ref.watch(organizationLogoProvider).value;
 
     final body = IndexedStack(index: _index, children: _tabs);
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        title: Row(
           children: <Widget>[
-            Text(businessName),
-            if (orgCode != null)
-              Text(
-                'ID: $orgCode',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w600,
+            if (logoBytes != null) ...<Widget>[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(DesignTokens.radiusSm),
+                child: Image.memory(
+                  logoBytes,
+                  width: 28,
+                  height: 28,
+                  fit: BoxFit.cover,
                 ),
               ),
+              const SizedBox(width: DesignTokens.spaceSm),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(businessName, overflow: TextOverflow.ellipsis),
+                  if (orgCode != null)
+                    Text(
+                      'ID: $orgCode',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
         actions: <Widget>[
-          if (isOwner)
+          if (isOwner) ...<Widget>[
+            IconButton(
+              tooltip: AppStrings.orgMembersTooltip,
+              onPressed: () => OrganizationMembersDialog.show(context),
+              icon: const Icon(Icons.groups_outlined),
+            ),
+            IconButton(
+              tooltip: AppStrings.orgEditTooltip,
+              onPressed: () => EditOrganizationDialog.show(context),
+              icon: const Icon(Icons.edit_outlined),
+            ),
             IconButton(
               tooltip: AppStrings.orgRequestsTooltip,
               onPressed: () => OrganizationRequestsDialog.show(context),
               icon: Badge.count(
                 count: pendingCount,
                 isLabelVisible: pendingCount > 0,
-                child: const Icon(Icons.group_outlined),
+                child: const Icon(Icons.how_to_reg_outlined),
               ),
             ),
+          ],
           IconButton(
             tooltip: AppStrings.logout,
             onPressed: () =>

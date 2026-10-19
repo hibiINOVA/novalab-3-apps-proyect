@@ -55,12 +55,14 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    final bytes = await container.read(printerCameraSnapshotProvider(1).future);
+    final bytes = await container.read(
+      printerCameraSnapshotProvider((printerId: 1, index: 0)).future,
+    );
     expect(bytes, isNotNull);
     expect(bytes, isNotEmpty);
 
     final unavailable = await container.read(
-      printerCameraSnapshotProvider(3).future,
+      printerCameraSnapshotProvider((printerId: 3, index: 0)).future,
     );
     expect(unavailable, isNull);
   });

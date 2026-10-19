@@ -37,10 +37,7 @@ void main() {
     final router = GoRouter(
       initialLocation: '/test',
       routes: [
-        GoRoute(
-          path: '/test',
-          builder: (context, state) => child,
-        ),
+        GoRoute(path: '/test', builder: (context, state) => child),
         GoRoute(
           path: '/organization/pending',
           builder: (context, state) =>
@@ -66,9 +63,7 @@ void main() {
           ),
         ),
       ],
-      child: MaterialApp.router(
-        routerConfig: router,
-      ),
+      child: MaterialApp.router(routerConfig: router),
     );
   }
 
@@ -87,9 +82,11 @@ void main() {
 
       // Ingresa nombre de la organización
       await tester.enterText(
-        find.byType(TextFormField),
+        find.byType(TextFormField).first,
         'Taller Master 3D',
       );
+      await tester.ensureVisible(find.text(AppStrings.orgCreateSubmit));
+      await tester.pumpAndSettle();
       await tester.tap(find.text(AppStrings.orgCreateSubmit));
       await tester.pumpAndSettle();
 
@@ -100,8 +97,9 @@ void main() {
       expect(find.text(AppStrings.orgGoToDashboard), findsOneWidget);
     });
 
-    testWidgets('Operador ingresa ID de organización y envía solicitud',
-        (tester) async {
+    testWidgets('Operador ingresa ID de organización y envía solicitud', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         buildTestWidget(
           child: const JoinOrganizationScreen(),
@@ -114,18 +112,16 @@ void main() {
       expect(find.text(AppStrings.orgJoinSubmit), findsOneWidget);
 
       // Ingresa el ID de la organización demo
-      await tester.enterText(
-        find.byType(TextFormField),
-        'ORG-NOVA-101',
-      );
+      await tester.enterText(find.byType(TextFormField), 'ORG-NOVA-101');
       await tester.tap(find.text(AppStrings.orgJoinSubmit));
       await tester.pumpAndSettle();
 
       expect(find.text('PENDING_ROUTE'), findsOneWidget);
     });
 
-    testWidgets('Operador en espera ve pantalla de aprobación pendiente',
-        (tester) async {
+    testWidgets('Operador en espera ve pantalla de aprobación pendiente', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         buildTestWidget(
           child: const PendingApprovalScreen(),
@@ -143,8 +139,9 @@ void main() {
       );
     });
 
-    testWidgets('Dueño puede abrir diálogo de solicitudes y aceptar',
-        (tester) async {
+    testWidgets('Dueño puede abrir diálogo de solicitudes y aceptar', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         buildTestWidget(
           child: const Scaffold(body: OrganizationRequestsDialog()),

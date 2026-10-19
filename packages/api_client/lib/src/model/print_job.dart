@@ -22,6 +22,7 @@ part 'print_job.g.dart';
 /// * [gramsReal]
 /// * [minutesReal]
 /// * [failureReason]
+/// * [currentFile] - Nombre del archivo G-code asociado al job (si se subió)
 @BuiltValue()
 abstract class PrintJob implements Built<PrintJob, PrintJobBuilder> {
   @BuiltValueField(wireName: r'id')
@@ -54,6 +55,10 @@ abstract class PrintJob implements Built<PrintJob, PrintJobBuilder> {
 
   @BuiltValueField(wireName: r'failure_reason')
   String? get failureReason;
+
+  /// Nombre del archivo G-code asociado al job (si se subió)
+  @BuiltValueField(wireName: r'current_file')
+  String? get currentFile;
 
   PrintJob._();
 
@@ -137,6 +142,13 @@ class _$PrintJobSerializer implements PrimitiveSerializer<PrintJob> {
       yield r'failure_reason';
       yield serializers.serialize(
         object.failureReason,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
+    if (object.currentFile != null) {
+      yield r'current_file';
+      yield serializers.serialize(
+        object.currentFile,
         specifiedType: const FullType.nullable(String),
       );
     }
@@ -240,6 +252,14 @@ class _$PrintJobSerializer implements PrimitiveSerializer<PrintJob> {
           ) as String?;
           if (valueDes == null) continue;
           result.failureReason = valueDes;
+          break;
+        case r'current_file':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.currentFile = valueDes;
           break;
         default:
           unhandled.add(key);

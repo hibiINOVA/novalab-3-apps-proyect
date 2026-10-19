@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novalab_api/novalab_api.dart';
@@ -6,6 +10,15 @@ import '../../../core/config/app_providers.dart';
 import '../../../core/i18n/app_strings.dart';
 import '../../../core/theme/design_tokens.dart';
 import '../../printers/printers_providers.dart';
+
+/// Resultado del diálogo de inicio de impresión (BE-05): confirmación
+/// explícita + G-code opcional adjunto.
+class StartPrintResult {
+  const StartPrintResult({this.gcodeBytes, this.gcodeName});
+
+  final Uint8List? gcodeBytes;
+  final String? gcodeName;
+}
 
 class PrintActions extends ConsumerWidget {
   const PrintActions({super.key, required this.item});
@@ -51,32 +64,11 @@ class PrintActions extends ConsumerWidget {
 
   Future<void> _start(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
-    final confirm = await showDialog<bool>(
+    final result = await showDialog<StartPrintResult>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text(AppStrings.printStartTitle),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(AppStrings.printStartConfirm),
-            SizedBox(height: DesignTokens.spaceSm),
-            Text(AppStrings.printStartWarning),
-          ],
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(AppStrings.printCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text(AppStrings.printConfirm),
-          ),
-        ],
-      ),
+      builder: (_) => const _StartPrintDialog(),
     );
-    if (confirm != true) return;
+    if (result == null) return;
 
     try {
       final printerId = item.printerId;
@@ -91,6 +83,30 @@ class PrintActions extends ConsumerWidget {
                 ..printerId = printerId,
             ),
           );
+      final jobId = job.data?.id;
+      final gcodeBytes = result.gcodeBytes;
+      final gcodeName = result.gcodeName;
+      if (gcodeBytes != null && gcodeName != null && jobId != null) {
+        // El job ya arrancó; subir el G-code es un paso adicional (si falla,
+        // el job sigue vivo y se avisa al operador).
+        try {
+          await ref
+              .read(novalabApiProvider)
+              .getPrintJobsApi()
+              .uploadPrintJobGcode(
+                jobId: jobId,
+                file: MultipartFile.fromBytes(gcodeBytes, filename: gcodeName),
+              );
+          messenger.showSnackBar(
+            const SnackBar(content: Text(AppStrings.printStartedWithGcode)),
+          );
+        } catch (_) {
+          messenger.showSnackBar(
+            const SnackBar(content: Text(AppStrings.printGcodeUploadError)),
+          );
+        }
+        return;
+      }
       messenger.showSnackBar(
         SnackBar(
           content: Text(
@@ -239,5 +255,121 @@ class PrintActions extends ConsumerWidget {
     // En pruebas, el UI no se invoca directamente; dejamos null y provocamos
     // error que ya mostramos. Si necesitáramos, podríamos mejorar el mock.
     return 1;
+  }
+}
+
+/// Diálogo de confirmación de inicio de impresión (BE-05) con G-code opcional.
+class _StartPrintDialog extends StatefulWidget {
+  const _StartPrintDialog();
+
+  @override
+  State<_StartPrintDialog> createState() => _StartPrintDialogState();
+}
+
+class _StartPrintDialogState extends State<_StartPrintDialog> {
+  Uint8List? _gcodeBytes;
+  String? _gcodeName;
+  String? _error;
+
+  Future<void> _pickGcode() async {
+    try {
+      final picked = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const <String>['gcode', 'gco', 'g'],
+      );
+      if (picked.isEmpty) return;
+      final file = picked.single;
+      final bytes = await file.readAsBytes();
+      setState(() {
+        _gcodeBytes = bytes;
+        _gcodeName = file.name;
+        _error = null;
+      });
+    } catch (_) {
+      setState(() => _error = AppStrings.printGcodePickError);
+    }
+  }
+
+  void _clearGcode() {
+    setState(() {
+      _gcodeBytes = null;
+      _gcodeName = null;
+      _error = null;
+    });
+  }
+
+  void _confirm() {
+    Navigator.of(
+      context,
+    ).pop(StartPrintResult(gcodeBytes: _gcodeBytes, gcodeName: _gcodeName));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasFile = _gcodeName != null;
+    return AlertDialog(
+      title: const Text(AppStrings.printStartTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(AppStrings.printStartConfirm),
+          const SizedBox(height: DesignTokens.spaceSm),
+          const Text(AppStrings.printStartWarning),
+          const SizedBox(height: DesignTokens.spaceMd),
+          OutlinedButton.icon(
+            onPressed: _pickGcode,
+            icon: const Icon(Icons.attach_file_outlined),
+            label: const Text(AppStrings.printAttachGcode),
+          ),
+          if (hasFile) ...<Widget>[
+            const SizedBox(height: DesignTokens.spaceSm),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DesignTokens.spaceSm,
+                vertical: DesignTokens.spaceXs,
+              ),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(DesignTokens.radiusSm),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Icon(Icons.insert_drive_file_outlined, size: 16),
+                  const SizedBox(width: DesignTokens.spaceXs),
+                  Flexible(
+                    child: Text(
+                      _gcodeName!,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: AppStrings.printGcodeClear,
+                    icon: const Icon(Icons.close, size: 16),
+                    onPressed: _clearGcode,
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (_error != null) ...<Widget>[
+            const SizedBox(height: DesignTokens.spaceSm),
+            Text(_error!, style: const TextStyle(color: DesignTokens.danger)),
+          ],
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(AppStrings.printCancel),
+        ),
+        FilledButton(
+          onPressed: _confirm,
+          child: const Text(AppStrings.printConfirm),
+        ),
+      ],
+    );
   }
 }

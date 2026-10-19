@@ -9,6 +9,9 @@
 library;
 
 import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 
 /// Credenciales de demostración aceptadas por el mock.
 const String kMockPassword = 'novalab';
@@ -51,6 +54,7 @@ class MockBackend {
   int _nextUserId = 3;
   int _nextOrgId = 2;
   int _nextRequestId = 1;
+  int _nextPrinterId = 4;
   int _currentUserId = 1;
 
   /// Correos ya registrados (los de demo cuentan como tomados).
@@ -69,6 +73,12 @@ class MockBackend {
   late Map<int, Map<String, Object?>> _userOrgMap;
   late List<Map<String, Object?>> _operatorRequests;
 
+  /// G-code subido por job (solo el nombre vive en `job['current_file']`).
+  late Map<int, Uint8List> _gcodeFiles;
+
+  /// Logo por organización (extensión incluida para el content-type).
+  late Map<int, ({Uint8List bytes, String ext})> _orgLogos;
+
   void _reset() {
     _queueVersion = 1;
     _nextJobId = 1;
@@ -78,6 +88,7 @@ class MockBackend {
     _nextUserId = 3;
     _nextOrgId = 2;
     _nextRequestId = 1;
+    _nextPrinterId = 4;
     _currentUserId = 1;
     _registeredEmails
       ..clear()
@@ -87,6 +98,10 @@ class MockBackend {
         'id': 1,
         'code': 'ORG-NOVA-101',
         'name': 'NOVALAB Demo',
+        'description': null,
+        'vision': null,
+        'mission': null,
+        'has_logo': false,
         'owner_id': 1,
         'created_at': '2026-10-12T08:00:00Z',
       },
@@ -112,6 +127,8 @@ class MockBackend {
       },
     };
     _operatorRequests = <Map<String, Object?>>[];
+    _gcodeFiles = <int, Uint8List>{};
+    _orgLogos = <int, ({Uint8List bytes, String ext})>{};
     _jobs = <Map<String, Object?>>[];
     _products = <Map<String, Object?>>[
       _product(1, 'Vaso', 'PETG', 'Negro', 45, 180, 20, 250),
@@ -131,6 +148,7 @@ class MockBackend {
       <String, Object?>{
         'id': 1,
         'name': 'Impresora 1',
+        'model': 'Prusa MK4',
         'state': 'printing',
         'progress': 42.5,
         'remaining_seconds': 1800,
@@ -140,6 +158,7 @@ class MockBackend {
         'bed_target': 60.0,
         'current_file': 'vaso_petg.gcode',
         'camera_available': true,
+        'cameras': <String>['mock://cam1/0', 'mock://cam1/1'],
         'loaded_spool': <String, Object?>{
           'id': 11,
           'material': 'PETG',
@@ -157,8 +176,10 @@ class MockBackend {
       <String, Object?>{
         'id': 2,
         'name': 'Impresora 2',
+        'model': 'Creality Ender 3 V3',
         'state': 'idle',
         'camera_available': true,
+        'cameras': <String>['mock://cam2/0'],
         'loaded_spool': <String, Object?>{
           'id': 12,
           'material': 'PLA',
@@ -170,6 +191,7 @@ class MockBackend {
       <String, Object?>{
         'id': 3,
         'name': 'Impresora 3',
+        'model': 'Bambu Lab A1',
         'state': 'offline',
         'camera_available': false,
         'last_seen': null,
@@ -403,18 +425,36 @@ class MockBackend {
   /// Despacha una petición contra el estado simulado.
   ///
   /// Devuelve `null` si la ruta no está simulada, para que la petición siga su
-  /// curso hacia el backend real.
-  MockResponse? handle(
+  /// curso hacia el backend real. Es `async` porque las rutas multipart
+  /// (G-code, logo) leen el archivo del [FormData].
+  Future<MockResponse?> handle(
     String method,
     String path,
     Object? body, {
     Map<String, dynamic>? query,
-  }) {
+  }) async {
     final cameraMatch = RegExp(
       r'^/api/printers/(\d+)/camera/snapshot$',
     ).firstMatch(path);
     if (method == 'GET' && cameraMatch != null) {
-      return _cameraSnapshot(int.parse(cameraMatch.group(1)!));
+      final index = int.tryParse('${query?['index'] ?? '0'}') ?? 0;
+      return _cameraSnapshot(int.parse(cameraMatch.group(1)!), index);
+    }
+
+    final testByIdMatch = RegExp(
+      r'^/api/printers/(\d+)/test$',
+    ).firstMatch(path);
+    if (method == 'POST' && testByIdMatch != null) {
+      return _testConnectionById(int.parse(testByIdMatch.group(1)!));
+    }
+
+    final gcodeMatch = RegExp(
+      r'^/api/print-jobs/(\d+)/gcode$',
+    ).firstMatch(path);
+    if (gcodeMatch != null) {
+      final jobId = int.parse(gcodeMatch.group(1)!);
+      if (method == 'POST') return _uploadGcode(jobId, body);
+      if (method == 'GET') return _downloadGcode(jobId);
     }
 
     final jobMatch = RegExp(
@@ -440,6 +480,19 @@ class MockBackend {
       return _updateOrderStatus(int.parse(orderStatusMatch.group(1)!), body);
     }
 
+    final printerMatch = RegExp(r'^/api/printers/(\d+)$').firstMatch(path);
+    if (printerMatch != null) {
+      final pid = int.parse(printerMatch.group(1)!);
+      if (method == 'GET') return _getPrinter(pid);
+      if (method == 'PATCH') return _updatePrinter(pid, body);
+      if (method == 'DELETE') return _deletePrinter(pid);
+    }
+
+    final customerMatch = RegExp(r'^/api/customers/(\d+)$').firstMatch(path);
+    if (customerMatch != null && method == 'GET') {
+      return _getCustomer(int.parse(customerMatch.group(1)!));
+    }
+
     final orgRequestMatch = RegExp(
       r'^/api/organizations/requests/(\d+)/(approve|reject)$',
     ).firstMatch(path);
@@ -459,8 +512,18 @@ class MockBackend {
         return _refresh(body);
       case 'POST /api/organizations':
         return _createOrganization(body);
+      case 'PATCH /api/organizations':
+        return _updateOrganization(body);
       case 'GET /api/organizations/current':
         return _getCurrentOrganization();
+      case 'GET /api/organizations/members':
+        return _listMembers();
+      case 'POST /api/organizations/logo':
+        return _uploadLogo(body);
+      case 'GET /api/organizations/logo':
+        return _downloadLogo();
+      case 'DELETE /api/organizations/logo':
+        return _deleteLogo();
       case 'POST /api/organizations/join':
         return _joinOrganization(body);
       case 'GET /api/organizations/requests':
@@ -469,6 +532,10 @@ class MockBackend {
         return const MockResponse(200, _branding);
       case 'GET /api/printers':
         return MockResponse(200, _printers);
+      case 'POST /api/printers':
+        return _createPrinter(body);
+      case 'POST /api/printers/test':
+        return _testConnection(body);
       case 'GET /api/queue':
         return MockResponse(200, _buildQueue());
       case 'PATCH /api/queue/reorder':
@@ -481,6 +548,8 @@ class MockBackend {
         return _startJob(body);
       case 'GET /api/customers':
         return MockResponse(200, _customers);
+      case 'POST /api/customers':
+        return _createCustomer(body);
       case 'GET /api/products':
         return MockResponse(200, _products);
       case 'GET /api/orders':
@@ -608,6 +677,10 @@ class MockBackend {
       'id': orgId,
       'code': code,
       'name': name,
+      'description': _identityText(map['description']),
+      'vision': _identityText(map['vision']),
+      'mission': _identityText(map['mission']),
+      'has_logo': false,
       'owner_id': _currentUserId,
       'created_at': DateTime.now().toUtc().toIso8601String(),
     };
@@ -739,6 +812,222 @@ class MockBackend {
     'language': 'es-MX',
   };
 
+  /// Normaliza un campo de identidad: `''` → `null` (mismo criterio que el
+  /// backend, para poder limpiar valores desde el cliente).
+  static String? _identityText(Object? value) {
+    if (value is! String) return null;
+    final text = value.trim();
+    return text.isEmpty ? null : text;
+  }
+
+  MockResponse _updateOrganization(Object? body) {
+    final owner = _currentOrgForOwner();
+    if (owner is MockResponse) return owner;
+    final org = owner as Map<String, Object?>;
+    final map = body is Map ? body : const <String, Object?>{};
+    if (map.containsKey('name') && map['name'] != null) {
+      final newName = ((map['name'] as String?) ?? '').trim();
+      if (newName.length < 2) {
+        return const MockResponse(400, <String, Object?>{
+          'code': 'invalid_name',
+          'message': 'El nombre debe tener al menos 2 caracteres.',
+        });
+      }
+      for (final other in _organizations.values) {
+        if (other['id'] != org['id'] &&
+            (other['name'] as String).toLowerCase() == newName.toLowerCase()) {
+          return const MockResponse(400, <String, Object?>{
+            'code': 'name_taken',
+            'message': 'Ese nombre de organización ya está en uso.',
+          });
+        }
+      }
+      org['name'] = newName;
+    }
+    for (final field in <String>['description', 'vision', 'mission']) {
+      if (map.containsKey(field)) {
+        org[field] = _identityText(map[field]);
+      }
+    }
+    return MockResponse(200, org);
+  }
+
+  /// Dueño actual con organización; `MockResponse` (error) si no califica.
+  Object _currentOrgForOwner() {
+    final user = _userOrgMap[_currentUserId];
+    if (user == null || user['role'] != 'owner') {
+      return const MockResponse(403, <String, Object?>{
+        'code': 'forbidden',
+        'message': 'Requiere rol owner.',
+      });
+    }
+    final orgId = user['organization_id'] as int?;
+    final org = orgId != null ? _organizations[orgId] : null;
+    if (org == null) {
+      return const MockResponse(404, <String, Object?>{
+        'code': 'not_found',
+        'message': 'No perteneces a ninguna organización.',
+      });
+    }
+    return org;
+  }
+
+  MockResponse _listMembers() {
+    final owner = _currentOrgForOwner();
+    if (owner is MockResponse) return owner;
+    final org = owner as Map<String, Object?>;
+    final members = <Map<String, Object?>>[];
+    for (final user in _userOrgMap.values) {
+      if (user['organization_id'] != org['id']) continue;
+      final status = (user['membership_status'] as String?) ?? 'none';
+      if (status != 'active') continue;
+      members.add(<String, Object?>{
+        'id': user['id'],
+        'user_id': user['id'],
+        'user_name': user['name'],
+        'user_email': user['email'],
+        'role': user['role'],
+        'status': status,
+        'organization_code': org['code'],
+        'organization_name': org['name'],
+        'created_at': org['created_at'],
+      });
+    }
+    return MockResponse(200, members);
+  }
+
+  Future<MockResponse> _uploadLogo(Object? body) async {
+    final owner = _currentOrgForOwner();
+    if (owner is MockResponse) return owner;
+    final org = owner as Map<String, Object?>;
+    final file = await _formFile(body);
+    if (file == null) {
+      return const MockResponse(422, <String, Object?>{
+        'code': 'missing_file',
+        'message': 'Falta el archivo.',
+      });
+    }
+    final ext = _extensionOf(file.$1);
+    if (!const <String>{'.png', '.jpg', '.jpeg', '.webp'}.contains(ext)) {
+      return const MockResponse(415, <String, Object?>{
+        'code': 'unsupported_media_type',
+        'message': 'Extensión no soportada; usa png, jpeg o webp.',
+      });
+    }
+    if (file.$2.length > 5 * 1024 * 1024) {
+      return const MockResponse(413, <String, Object?>{
+        'code': 'file_too_large',
+        'message': 'El archivo supera el máximo de 5 MB.',
+      });
+    }
+    if (file.$2.isEmpty) {
+      return const MockResponse(422, <String, Object?>{
+        'code': 'empty_file',
+        'message': 'El archivo está vacío.',
+      });
+    }
+    _orgLogos[org['id']! as int] = (bytes: file.$2, ext: ext);
+    org['has_logo'] = true;
+    return MockResponse(200, org);
+  }
+
+  MockResponse _downloadLogo() {
+    final user = _userOrgMap[_currentUserId];
+    final orgId = user?['organization_id'] as int?;
+    final org = orgId != null ? _organizations[orgId] : null;
+    final logo = orgId != null ? _orgLogos[orgId] : null;
+    if (org == null || logo == null) {
+      return const MockResponse(404, <String, Object?>{
+        'code': 'not_found',
+        'message': 'La organización no tiene logo.',
+      });
+    }
+    final media = switch (logo.ext) {
+      '.jpg' || '.jpeg' => 'image/jpeg',
+      '.webp' => 'image/webp',
+      _ => 'image/png',
+    };
+    return MockResponse(200, logo.bytes, contentType: media);
+  }
+
+  MockResponse _deleteLogo() {
+    final owner = _currentOrgForOwner();
+    if (owner is MockResponse) return owner;
+    final org = owner as Map<String, Object?>;
+    _orgLogos.remove(org['id']! as int);
+    org['has_logo'] = false;
+    return MockResponse(200, org);
+  }
+
+  Future<MockResponse> _uploadGcode(int jobId, Object? body) async {
+    final job = _jobById(jobId);
+    if (job == null) {
+      return const MockResponse(404, <String, Object?>{
+        'code': 'not_found',
+        'message': 'Job no encontrado.',
+      });
+    }
+    final file = await _formFile(body);
+    if (file == null) {
+      return const MockResponse(422, <String, Object?>{
+        'code': 'missing_file',
+        'message': 'Falta el archivo.',
+      });
+    }
+    final ext = _extensionOf(file.$1);
+    if (!const <String>{'.gcode', '.gco', '.g'}.contains(ext)) {
+      return MockResponse(415, <String, Object?>{
+        'code': 'unsupported_media_type',
+        'message': 'Extensión no soportada: $ext.',
+      });
+    }
+    if (file.$2.length > 50 * 1024 * 1024) {
+      return const MockResponse(413, <String, Object?>{
+        'code': 'file_too_large',
+        'message': 'El archivo supera el máximo de 50 MB.',
+      });
+    }
+    if (file.$2.isEmpty) {
+      return const MockResponse(422, <String, Object?>{
+        'code': 'empty_file',
+        'message': 'El archivo está vacío.',
+      });
+    }
+    _gcodeFiles[jobId] = file.$2;
+    job['current_file'] = file.$1;
+    final printer = _printerById(job['printer_id'] as int?);
+    if (printer != null) printer['current_file'] = file.$1;
+    return MockResponse(200, job);
+  }
+
+  MockResponse _downloadGcode(int jobId) {
+    final job = _jobById(jobId);
+    final bytes = _gcodeFiles[jobId];
+    if (job == null || bytes == null) {
+      return const MockResponse(404, <String, Object?>{
+        'code': 'not_found',
+        'message': 'Job sin archivo G-code.',
+      });
+    }
+    return MockResponse(200, bytes, contentType: 'application/octet-stream');
+  }
+
+  /// Extrae el primer archivo de un [FormData] multipart.
+  Future<(String, Uint8List)?> _formFile(Object? body) async {
+    if (body is! FormData || body.files.isEmpty) return null;
+    final file = body.files.first.value;
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in file.finalize()) {
+      builder.add(chunk);
+    }
+    return (file.filename ?? 'archivo', builder.takeBytes());
+  }
+
+  static String _extensionOf(String filename) {
+    final index = filename.lastIndexOf('.');
+    return index == -1 ? '' : filename.substring(index).toLowerCase();
+  }
+
   Map<String, Object?> _buildQueue() {
     final unassigned = <Map<String, Object?>>[];
     final byPrinter = <String, List<Map<String, Object?>>>{};
@@ -787,7 +1076,7 @@ class MockBackend {
     return MockResponse(200, _buildQueue());
   }
 
-  MockResponse _cameraSnapshot(int printerId) {
+  MockResponse _cameraSnapshot(int printerId, int index) {
     final match = _printers.where((p) => p['id'] == printerId).toList();
     if (match.isEmpty || match.first['camera_available'] != true) {
       return const MockResponse(404, <String, Object?>{
@@ -795,11 +1084,189 @@ class MockBackend {
         'message': 'La impresora no tiene cámara o aún no hay snapshot.',
       });
     }
+    final cameras = match.first['cameras'] as List<Object?>? ?? const [];
+    if (index >= cameras.length) {
+      return const MockResponse(404, <String, Object?>{
+        'code': 'camera_unavailable',
+        'message': 'Índice de cámara fuera de rango.',
+      });
+    }
     return MockResponse(
       200,
       base64Decode(kMockCameraPngBase64),
       contentType: 'image/png',
     );
+  }
+
+  // BE-01: probar conexión a OctoPrint (mock siempre responde ok si hay URL).
+  MockResponse _testConnection(Object? body) {
+    final map = body is Map ? body : const <String, Object?>{};
+    final url =
+        ((map['octoprint_url'] ?? map['octoprintUrl']) as String?)?.trim() ??
+        '';
+    if (url.isEmpty) {
+      return const MockResponse(422, <String, Object?>{
+        'code': 'invalid_url',
+        'message': 'La URL de OctoPrint es obligatoria.',
+      });
+    }
+    return MockResponse(200, <String, Object?>{
+      'ok': true,
+      'message': 'Conexión exitosa con OctoPrint.',
+      'version': '1.10.3 (mock)',
+    });
+  }
+
+  MockResponse _testConnectionById(int printerId) {
+    final printer = _printerById(printerId);
+    if (printer == null || printer['octoprint_url'] == null) {
+      return const MockResponse(404, <String, Object?>{
+        'code': 'not_found',
+        'message': 'Impresora sin URL de OctoPrint configurada.',
+      });
+    }
+    return MockResponse(200, <String, Object?>{
+      'ok': true,
+      'message': 'Conexión exitosa con OctoPrint.',
+      'version': '1.10.3 (mock)',
+    });
+  }
+
+  // --- CRUD Impresoras ----------------------------------------------------
+
+  MockResponse _createPrinter(Object? body) {
+    final map = body is Map ? body : const <String, Object?>{};
+    final name = (map['name'] as String?)?.trim() ?? '';
+    if (name.isEmpty) {
+      return const MockResponse(422, <String, Object?>{
+        'code': 'invalid_name',
+        'message': 'El nombre de la impresora es obligatorio.',
+      });
+    }
+    final id = _nextPrinterId++;
+    final model = ((map['model'] as String?) ?? '').trim();
+    final printer = <String, Object?>{
+      'id': id,
+      'name': name,
+      'model': model.isEmpty ? null : model,
+      'state': 'idle',
+      'progress': null,
+      'remaining_seconds': null,
+      'nozzle_temp': null,
+      'nozzle_target': null,
+      'bed_temp': null,
+      'bed_target': null,
+      'current_file': null,
+      'octoprint_url': map['octoprint_url'] as String?,
+      'api_key': null,
+      'camera_available': (map['camera_available'] as bool?) ?? false,
+      'cameras': (map['cameras'] as List<Object?>?) ?? const <String>[],
+      'loaded_spool': null,
+      'current_order': null,
+      'last_seen': _now(),
+    };
+    _printers.add(printer);
+    return MockResponse(201, printer);
+  }
+
+  MockResponse _getPrinter(int printerId) {
+    final printer = _printerById(printerId);
+    if (printer == null) {
+      return const MockResponse(404, <String, Object?>{
+        'code': 'not_found',
+        'message': 'Impresora no encontrada.',
+      });
+    }
+    return MockResponse(200, printer);
+  }
+
+  MockResponse _updatePrinter(int printerId, Object? body) {
+    final printer = _printerById(printerId);
+    if (printer == null) {
+      return const MockResponse(404, <String, Object?>{
+        'code': 'not_found',
+        'message': 'Impresora no encontrada.',
+      });
+    }
+    final map = body is Map ? body : const <String, Object?>{};
+    if (map.containsKey('name')) {
+      final name = (map['name'] as String?)?.trim() ?? '';
+      if (name.isNotEmpty) printer['name'] = name;
+    }
+    if (map.containsKey('model')) {
+      final model = (map['model'] as String?)?.trim() ?? '';
+      printer['model'] = model.isEmpty ? null : model;
+    }
+    if (map.containsKey('camera_available')) {
+      printer['camera_available'] = map['camera_available'] as bool? ?? false;
+    }
+    if (map.containsKey('cameras')) {
+      printer['cameras'] = (map['cameras'] as List<Object?>?) ?? const [];
+    }
+    if (map.containsKey('octoprint_url')) {
+      printer['octoprint_url'] = map['octoprint_url'] as String?;
+    }
+    if (map.containsKey('state')) {
+      printer['state'] = (map['state'] as String?) ?? printer['state'];
+    }
+    return MockResponse(200, printer);
+  }
+
+  MockResponse _deletePrinter(int printerId) {
+    final printer = _printerById(printerId);
+    if (printer == null) {
+      return const MockResponse(404, <String, Object?>{
+        'code': 'not_found',
+        'message': 'Impresora no encontrada.',
+      });
+    }
+    _printers.removeWhere((p) => p['id'] == printerId);
+    for (final item in _queueItems) {
+      if (item['printer_id'] == printerId) {
+        item['printer_id'] = null;
+        if (item['state'] == 'printing') {
+          item['state'] = 'queued';
+        }
+      }
+    }
+    _queueVersion++;
+    return const MockResponse(204, null);
+  }
+
+  // --- Clientes -----------------------------------------------------------
+
+  MockResponse _createCustomer(Object? body) {
+    final map = body is Map ? body : const <String, Object?>{};
+    final name = (map['name'] as String?)?.trim() ?? '';
+    if (name.isEmpty) {
+      return const MockResponse(422, <String, Object?>{
+        'code': 'invalid_name',
+        'message': 'El nombre del cliente es obligatorio.',
+      });
+    }
+    final id = _nextCustomerId++;
+    final cust = _customer(
+      id,
+      name,
+      (map['phone'] as String?) ?? '',
+      (map['email'] as String?) ?? '',
+    );
+    if (map.containsKey('notes')) {
+      cust['notes'] = map['notes'];
+    }
+    _customers.add(cust);
+    return MockResponse(201, cust);
+  }
+
+  MockResponse _getCustomer(int customerId) {
+    final cust = _firstWhereOrNull(_customers, (c) => c['id'] == customerId);
+    if (cust == null) {
+      return const MockResponse(404, <String, Object?>{
+        'code': 'not_found',
+        'message': 'Cliente no encontrado.',
+      });
+    }
+    return MockResponse(200, cust);
   }
 
   // --- P-04: sugerencia de asignación -------------------------------------
@@ -1029,6 +1496,7 @@ class MockBackend {
     'grams_real': null,
     'minutes_real': null,
     'failure_reason': null,
+    'current_file': null,
   };
 
   void _idlePrinter(Map<String, Object?>? printer) {

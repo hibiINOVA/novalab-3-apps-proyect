@@ -1,6 +1,8 @@
 """Punto de entrada FastAPI. Arranque: uvicorn app.main:app --port 8081."""
 
-from contextlib import asynccontextmanager
+import asyncio
+import logging
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,8 +11,20 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.db import Base, get_session_factory, get_engine, init_db
-from app.routers import auth, catalog, orders, print_jobs, printers, public, queue, ws
+from app.routers import (
+    auth,
+    catalog,
+    orders,
+    organizations,
+    print_jobs,
+    printers,
+    public,
+    queue,
+    ws,
+)
 from app.seed import seed_demo
+
+log = logging.getLogger("novalab")
 
 
 @asynccontextmanager
@@ -25,7 +39,17 @@ async def lifespan(app: FastAPI):
             seed_demo(session)
         finally:
             session.close()
+    # BE-02: poller de impresoras OctoPrint (se omite en tests vía flag).
+    poller_task: asyncio.Task | None = None
+    if settings.poller_enabled:
+        from app.services.poller import poller_loop
+
+        poller_task = asyncio.create_task(poller_loop())
     yield
+    if poller_task is not None:
+        poller_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await poller_task
 
 
 app = FastAPI(
@@ -74,6 +98,7 @@ def health():
 
 # Routers
 app.include_router(auth.router)
+app.include_router(organizations.router)
 app.include_router(public.router)
 app.include_router(printers.router)
 app.include_router(queue.router)

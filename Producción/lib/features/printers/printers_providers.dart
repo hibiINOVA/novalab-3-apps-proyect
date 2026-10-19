@@ -48,24 +48,115 @@ class PrintersController extends AsyncNotifier<List<Printer>> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(_fetchPrinters);
   }
+
+  /// Crea una nueva impresora (P-02 CRUD).
+  Future<Printer?> createPrinter({
+    required String name,
+    String? model,
+    String? octoprintUrl,
+    String? apiKey,
+    double? bedWidth,
+    double? bedDepth,
+    bool cameraAvailable = false,
+    List<String>? cameras,
+  }) async {
+    final response = await ref
+        .read(novalabApiProvider)
+        .getPrintersApi()
+        .createPrinter(
+          printerCreateRequest: PrinterCreateRequest(
+            (b) => b
+              ..name = name
+              ..model = model
+              ..octoprintUrl = octoprintUrl
+              ..apiKey = apiKey
+              ..bedWidth = bedWidth
+              ..bedDepth = bedDepth
+              ..cameraAvailable = cameraAvailable
+              ..cameras.replace(cameras ?? <String>[]),
+          ),
+        );
+    final printer = response.data;
+    if (printer != null) {
+      final current = state.value ?? <Printer>[];
+      state = AsyncData(<Printer>[...current, printer]);
+    }
+    return printer;
+  }
+
+  /// Actualiza una impresora existente.
+  Future<Printer?> updatePrinter({
+    required int id,
+    String? name,
+    String? model,
+    String? octoprintUrl,
+    String? apiKey,
+    double? bedWidth,
+    double? bedDepth,
+    bool? cameraAvailable,
+    List<String>? cameras,
+  }) async {
+    final response = await ref
+        .read(novalabApiProvider)
+        .getPrintersApi()
+        .updatePrinter(
+          printerId: id,
+          printerUpdateRequest: PrinterUpdateRequest(
+            (b) => b
+              ..name = name
+              ..model = model
+              ..octoprintUrl = octoprintUrl
+              ..apiKey = apiKey
+              ..bedWidth = bedWidth
+              ..bedDepth = bedDepth
+              ..cameraAvailable = cameraAvailable
+              ..cameras.replace(cameras ?? <String>[]),
+          ),
+        );
+    final updated = response.data;
+    if (updated != null) {
+      final current = state.value ?? <Printer>[];
+      state = AsyncData(current.map((p) => p.id == id ? updated : p).toList());
+    }
+    return updated;
+  }
+
+  /// Elimina una impresora.
+  Future<bool> deletePrinter(int id) async {
+    final response = await ref
+        .read(novalabApiProvider)
+        .getPrintersApi()
+        .deletePrinter(printerId: id);
+    if (response.statusCode == 204) {
+      final current = state.value ?? <Printer>[];
+      state = AsyncData(current.where((p) => p.id != id).toList());
+      return true;
+    }
+    return false;
+  }
 }
 
-/// Última miniatura de cámara de una impresora (BE-07/08).
+/// Último snapshot de una cámara de impresora (BE-07/08).
 ///
-/// Devuelve `null` si la impresora no tiene cámara o aún no hay snapshot, para
-/// mostrar un marcador de posición en lugar de un error.
-final printerCameraSnapshotProvider = FutureProvider.family<Uint8List?, int>((
-  ref,
-  printerId,
-) async {
-  try {
-    final response = await ref
-        .watch(novalabApiProvider)
-        .getPrintersApi()
-        .getPrinterCameraSnapshot(printerId: printerId);
-    return response.data;
-  } on DioException catch (error) {
-    if (error.response?.statusCode == 404) return null;
-    rethrow;
-  }
-});
+/// [index] selecciona la cámara (0 = principal). Devuelve `null` si la
+/// impresora no tiene cámara o aún no hay snapshot, para mostrar un marcador
+/// de posición en lugar de un error.
+final printerCameraSnapshotProvider =
+    FutureProvider.family<Uint8List?, ({int printerId, int index})>((
+      ref,
+      key,
+    ) async {
+      try {
+        final response = await ref
+            .watch(novalabApiProvider)
+            .getPrintersApi()
+            .getPrinterCameraSnapshot(
+              printerId: key.printerId,
+              index: key.index,
+            );
+        return response.data;
+      } on DioException catch (error) {
+        if (error.response?.statusCode == 404) return null;
+        rethrow;
+      }
+    });

@@ -10,6 +10,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add($OrderSummary.serializer)
       ..add(Branding.serializer)
       ..add(Customer.serializer)
+      ..add(CustomerCreateRequest.serializer)
       ..add(DueState.serializer)
       ..add(Error.serializer)
       ..add(ItemState.serializer)
@@ -27,11 +28,16 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(Organization.serializer)
       ..add(OrganizationCreateRequest.serializer)
       ..add(OrganizationMember.serializer)
+      ..add(OrganizationUpdateRequest.serializer)
       ..add(PrintJob.serializer)
       ..add(PrintJobFailRequest.serializer)
       ..add(PrintJobStartRequest.serializer)
       ..add(Printer.serializer)
+      ..add(PrinterConnectionTest.serializer)
+      ..add(PrinterConnectionTestRequest.serializer)
+      ..add(PrinterCreateRequest.serializer)
       ..add(PrinterState.serializer)
+      ..add(PrinterUpdateRequest.serializer)
       ..add(Product.serializer)
       ..add(PublicLookupRequest.serializer)
       ..add(PublicLookupResponse.serializer)
@@ -77,6 +83,15 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(OrderItem)]),
           () => ListBuilder<OrderItem>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
       ..addBuilderFactory(
           const FullType(
               BuiltList, const [const FullType(SuggestionAssignment)]),

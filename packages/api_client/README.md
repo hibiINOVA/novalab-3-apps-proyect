@@ -68,6 +68,8 @@ Class | Method | HTTP request | Description
 [*AuthApi*](doc/AuthApi.md) | [**login**](doc/AuthApi.md#login) | **POST** /api/auth/login | Inicia sesión y devuelve tokens JWT
 [*AuthApi*](doc/AuthApi.md) | [**refreshToken**](doc/AuthApi.md#refreshtoken) | **POST** /api/auth/refresh | Renueva el access token
 [*AuthApi*](doc/AuthApi.md) | [**register**](doc/AuthApi.md#register) | **POST** /api/auth/register | Crea una cuenta nueva y devuelve tokens (registro abierto)
+[*CustomersApi*](doc/CustomersApi.md) | [**createCustomer**](doc/CustomersApi.md#createcustomer) | **POST** /api/customers | Registra un nuevo cliente
+[*CustomersApi*](doc/CustomersApi.md) | [**getCustomer**](doc/CustomersApi.md#getcustomer) | **GET** /api/customers/{customerId} | Detalle de un cliente por su ID
 [*CustomersApi*](doc/CustomersApi.md) | [**listCustomers**](doc/CustomersApi.md#listcustomers) | **GET** /api/customers | Lista de clientes (para nuevo pedido)
 [*OrdersApi*](doc/OrdersApi.md) | [**createOrder**](doc/OrdersApi.md#createorder) | **POST** /api/orders | Crea un pedido nuevo (P-09)
 [*OrdersApi*](doc/OrdersApi.md) | [**getOrder**](doc/OrdersApi.md#getorder) | **GET** /api/orders/{orderId} | Detalle de pedido (items, faltantes, historial, envío)
@@ -75,16 +77,29 @@ Class | Method | HTTP request | Description
 [*OrdersApi*](doc/OrdersApi.md) | [**updateOrderStatus**](doc/OrdersApi.md#updateorderstatus) | **PATCH** /api/orders/{orderId}/status | Cambio manual de estado (Empacado, Enviado, Entregado, Cancelado)
 [*OrganizationsApi*](doc/OrganizationsApi.md) | [**approveOrganizationRequest**](doc/OrganizationsApi.md#approveorganizationrequest) | **POST** /api/organizations/requests/{requestId}/approve | Dueño acepta la solicitud de un operador
 [*OrganizationsApi*](doc/OrganizationsApi.md) | [**createOrganization**](doc/OrganizationsApi.md#createorganization) | **POST** /api/organizations | Crea una organización nueva (Dueño) y genera su ID único
+[*OrganizationsApi*](doc/OrganizationsApi.md) | [**deleteOrganizationLogo**](doc/OrganizationsApi.md#deleteorganizationlogo) | **DELETE** /api/organizations/logo | Elimina el logo de la organización (Dueño)
+[*OrganizationsApi*](doc/OrganizationsApi.md) | [**downloadOrganizationLogo**](doc/OrganizationsApi.md#downloadorganizationlogo) | **GET** /api/organizations/logo | Descarga el logo de la organización (miembro autenticado)
 [*OrganizationsApi*](doc/OrganizationsApi.md) | [**getCurrentOrganization**](doc/OrganizationsApi.md#getcurrentorganization) | **GET** /api/organizations/current | Obtiene el estado actual de la organización y membresía del usuario
 [*OrganizationsApi*](doc/OrganizationsApi.md) | [**joinOrganization**](doc/OrganizationsApi.md#joinorganization) | **POST** /api/organizations/join | Operador solicita unirse a una organización usando su ID
+[*OrganizationsApi*](doc/OrganizationsApi.md) | [**listOrganizationMembers**](doc/OrganizationsApi.md#listorganizationmembers) | **GET** /api/organizations/members | Lista los miembros activos de la organización (Dueño)
 [*OrganizationsApi*](doc/OrganizationsApi.md) | [**listOrganizationRequests**](doc/OrganizationsApi.md#listorganizationrequests) | **GET** /api/organizations/requests | Lista de solicitudes pendientes de operadores (Dueño)
 [*OrganizationsApi*](doc/OrganizationsApi.md) | [**rejectOrganizationRequest**](doc/OrganizationsApi.md#rejectorganizationrequest) | **POST** /api/organizations/requests/{requestId}/reject | Dueño rechaza la solicitud de un operador
+[*OrganizationsApi*](doc/OrganizationsApi.md) | [**updateOrganization**](doc/OrganizationsApi.md#updateorganization) | **PATCH** /api/organizations | Actualiza los datos de la organización (Dueño)
+[*OrganizationsApi*](doc/OrganizationsApi.md) | [**uploadOrganizationLogo**](doc/OrganizationsApi.md#uploadorganizationlogo) | **POST** /api/organizations/logo | Sube el logo de la organización (Dueño)
 [*PrintJobsApi*](doc/PrintJobsApi.md) | [**completePrintJob**](doc/PrintJobsApi.md#completeprintjob) | **POST** /api/print-jobs/{jobId}/complete | Marca un job como terminado
+[*PrintJobsApi*](doc/PrintJobsApi.md) | [**downloadPrintJobGcode**](doc/PrintJobsApi.md#downloadprintjobgcode) | **GET** /api/print-jobs/{jobId}/gcode | Descarga el archivo G-code asociado a un job
 [*PrintJobsApi*](doc/PrintJobsApi.md) | [**failPrintJob**](doc/PrintJobsApi.md#failprintjob) | **POST** /api/print-jobs/{jobId}/fail | Marca un job como fallido y registra el motivo
 [*PrintJobsApi*](doc/PrintJobsApi.md) | [**reprintJob**](doc/PrintJobsApi.md#reprintjob) | **POST** /api/print-jobs/{jobId}/reprint | Crea un nuevo job para reimprimir un item fallido
 [*PrintJobsApi*](doc/PrintJobsApi.md) | [**startPrintJob**](doc/PrintJobsApi.md#startprintjob) | **POST** /api/print-jobs | Confirma e inicia la impresión de un item (BE-05)
+[*PrintJobsApi*](doc/PrintJobsApi.md) | [**uploadPrintJobGcode**](doc/PrintJobsApi.md#uploadprintjobgcode) | **POST** /api/print-jobs/{jobId}/gcode | Sube el archivo G-code asociado a un job (BE-05)
+[*PrintersApi*](doc/PrintersApi.md) | [**createPrinter**](doc/PrintersApi.md#createprinter) | **POST** /api/printers | Registra una nueva impresora en el taller
+[*PrintersApi*](doc/PrintersApi.md) | [**deletePrinter**](doc/PrintersApi.md#deleteprinter) | **DELETE** /api/printers/{printerId} | Elimina una impresora del taller
+[*PrintersApi*](doc/PrintersApi.md) | [**getPrinter**](doc/PrintersApi.md#getprinter) | **GET** /api/printers/{printerId} | Detalle de una impresora
 [*PrintersApi*](doc/PrintersApi.md) | [**getPrinterCameraSnapshot**](doc/PrintersApi.md#getprintercamerasnapshot) | **GET** /api/printers/{printerId}/camera/snapshot | Última miniatura de cámara de la impresora (servida por el backend)
 [*PrintersApi*](doc/PrintersApi.md) | [**listPrinters**](doc/PrintersApi.md#listprinters) | **GET** /api/printers | Lista las impresoras con su estado en vivo
+[*PrintersApi*](doc/PrintersApi.md) | [**testPrinterConnection**](doc/PrintersApi.md#testprinterconnection) | **POST** /api/printers/test | Prueba la conexión a OctoPrint con URL y API key (BE-01)
+[*PrintersApi*](doc/PrintersApi.md) | [**testPrinterConnectionById**](doc/PrintersApi.md#testprinterconnectionbyid) | **POST** /api/printers/{printerId}/test | Prueba la conexión guardada de una impresora (BE-01)
+[*PrintersApi*](doc/PrintersApi.md) | [**updatePrinter**](doc/PrintersApi.md#updateprinter) | **PATCH** /api/printers/{printerId} | Actualiza configuración o estado de la impresora
 [*ProductsApi*](doc/ProductsApi.md) | [**listProducts**](doc/ProductsApi.md#listproducts) | **GET** /api/products | Catálogo de productos (para nuevo pedido)
 [*PublicApi*](doc/PublicApi.md) | [**getBranding**](doc/PublicApi.md#getbranding) | **GET** /api/public/branding | Marca y configuración visible del negocio
 [*PublicApi*](doc/PublicApi.md) | [**getPublicTrack**](doc/PublicApi.md#getpublictrack) | **GET** /api/public/track/{token} | Seguimiento público de pedido por token
@@ -100,6 +115,7 @@ Class | Method | HTTP request | Description
 
  - [Branding](doc/Branding.md)
  - [Customer](doc/Customer.md)
+ - [CustomerCreateRequest](doc/CustomerCreateRequest.md)
  - [DueState](doc/DueState.md)
  - [Error](doc/Error.md)
  - [ItemState](doc/ItemState.md)
@@ -118,11 +134,16 @@ Class | Method | HTTP request | Description
  - [Organization](doc/Organization.md)
  - [OrganizationCreateRequest](doc/OrganizationCreateRequest.md)
  - [OrganizationMember](doc/OrganizationMember.md)
+ - [OrganizationUpdateRequest](doc/OrganizationUpdateRequest.md)
  - [PrintJob](doc/PrintJob.md)
  - [PrintJobFailRequest](doc/PrintJobFailRequest.md)
  - [PrintJobStartRequest](doc/PrintJobStartRequest.md)
  - [Printer](doc/Printer.md)
+ - [PrinterConnectionTest](doc/PrinterConnectionTest.md)
+ - [PrinterConnectionTestRequest](doc/PrinterConnectionTestRequest.md)
+ - [PrinterCreateRequest](doc/PrinterCreateRequest.md)
  - [PrinterState](doc/PrinterState.md)
+ - [PrinterUpdateRequest](doc/PrinterUpdateRequest.md)
  - [Product](doc/Product.md)
  - [PublicLookupRequest](doc/PublicLookupRequest.md)
  - [PublicLookupResponse](doc/PublicLookupResponse.md)

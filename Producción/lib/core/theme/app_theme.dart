@@ -248,8 +248,14 @@ abstract final class AppTheme {
           color: DesignTokens.white,
           fontWeight: FontWeight.w700,
         ),
-        titleLarge: TextStyle(color: DesignTokens.white, fontWeight: FontWeight.w600),
-        titleMedium: TextStyle(color: DesignTokens.white, fontWeight: FontWeight.w600),
+        titleLarge: TextStyle(
+          color: DesignTokens.white,
+          fontWeight: FontWeight.w600,
+        ),
+        titleMedium: TextStyle(
+          color: DesignTokens.white,
+          fontWeight: FontWeight.w600,
+        ),
         titleSmall: TextStyle(color: DesignTokens.white),
         bodyLarge: TextStyle(color: DesignTokens.white),
         bodyMedium: TextStyle(color: Color(0xFFB0BEC5)),

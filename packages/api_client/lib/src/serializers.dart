@@ -16,6 +16,7 @@ import 'package:novalab_api/src/model/date.dart';
 
 import 'package:novalab_api/src/model/branding.dart';
 import 'package:novalab_api/src/model/customer.dart';
+import 'package:novalab_api/src/model/customer_create_request.dart';
 import 'package:novalab_api/src/model/due_state.dart';
 import 'package:novalab_api/src/model/error.dart';
 import 'package:novalab_api/src/model/item_state.dart';
@@ -34,11 +35,16 @@ import 'package:novalab_api/src/model/order_summary.dart';
 import 'package:novalab_api/src/model/organization.dart';
 import 'package:novalab_api/src/model/organization_create_request.dart';
 import 'package:novalab_api/src/model/organization_member.dart';
+import 'package:novalab_api/src/model/organization_update_request.dart';
 import 'package:novalab_api/src/model/print_job.dart';
 import 'package:novalab_api/src/model/print_job_fail_request.dart';
 import 'package:novalab_api/src/model/print_job_start_request.dart';
 import 'package:novalab_api/src/model/printer.dart';
+import 'package:novalab_api/src/model/printer_connection_test.dart';
+import 'package:novalab_api/src/model/printer_connection_test_request.dart';
+import 'package:novalab_api/src/model/printer_create_request.dart';
 import 'package:novalab_api/src/model/printer_state.dart';
+import 'package:novalab_api/src/model/printer_update_request.dart';
 import 'package:novalab_api/src/model/product.dart';
 import 'package:novalab_api/src/model/public_lookup_request.dart';
 import 'package:novalab_api/src/model/public_lookup_response.dart';
@@ -66,6 +72,7 @@ part 'serializers.g.dart';
 @SerializersFor([
   Branding,
   Customer,
+  CustomerCreateRequest,
   DueState,
   Error,
   ItemState,
@@ -85,11 +92,16 @@ part 'serializers.g.dart';
   Organization,
   OrganizationCreateRequest,
   OrganizationMember,
+  OrganizationUpdateRequest,
   PrintJob,
   PrintJobFailRequest,
   PrintJobStartRequest,
   Printer,
+  PrinterConnectionTest,
+  PrinterConnectionTestRequest,
+  PrinterCreateRequest,
   PrinterState,
+  PrinterUpdateRequest,
   Product,
   PublicLookupRequest,
   PublicLookupResponse,

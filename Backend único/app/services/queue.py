@@ -80,15 +80,41 @@ def check_version(db: Session, client_version: int) -> bool:
     return client_version == get_version(db)
 
 
+def _next_position(db: Session, printer_id: int | None) -> int:
+    """Siguiente posición libre en la impresora (o en 'sin asignar')."""
+    stmt = select(OrderItem).where(OrderItem.state.in_(ACTIVE_STATES))
+    if printer_id is None:
+        stmt = stmt.where(OrderItem.printer_id.is_(None))
+    else:
+        stmt = stmt.where(OrderItem.printer_id == printer_id)
+    positions = [i.position for i in db.scalars(stmt).all()]
+    return max(positions, default=-1) + 1
+
+
 def apply_entries(db: Session, entries: list[dict]) -> int:
-    """Aplica {id, printer_id, position} y devuelve la nueva versión."""
+    """Aplica entradas de reorder `{id, printer_id, position}` o de accept
+    `{item_id, printer_id}` y devuelve la nueva versión.
+
+    En accept (sin `position`) el item se agrega al final de su impresora.
+    """
+    next_pos: dict[str, int] = {}
     for entry in entries:
-        item = db.get(OrderItem, entry["id"])
+        item_id = entry.get("item_id", entry.get("id"))
+        item = db.get(OrderItem, item_id)
         if item is None:
             continue
         printer_id = entry.get("printer_id")
         item.printer_id = printer_id
-        item.position = entry.get("position") or 0
+        position = entry.get("position")
+        if position is None:
+            # accept: append al final (como el mock, `_nextPosition`).
+            key = "" if printer_id is None else str(printer_id)
+            if key not in next_pos:
+                next_pos[key] = _next_position(db, printer_id)
+            item.position = next_pos[key]
+            next_pos[key] += 1
+        else:
+            item.position = position
         # Asignar a impresora saca al item de 'pending' (BE-11).
         if printer_id is not None and item.state == "pending":
             item.state = "queued"

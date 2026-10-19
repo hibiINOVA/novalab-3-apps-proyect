@@ -15,6 +15,10 @@ part 'organization.g.dart';
 /// * [code] - ID único de la organización para compartir con operadores (p. ej. ORG-NOVA-8492)
 /// * [name]
 /// * [ownerId]
+/// * [description]
+/// * [vision]
+/// * [mission]
+/// * [hasLogo]
 /// * [createdAt]
 @BuiltValue()
 abstract class Organization
@@ -32,6 +36,18 @@ abstract class Organization
   @BuiltValueField(wireName: r'owner_id')
   int get ownerId;
 
+  @BuiltValueField(wireName: r'description')
+  String? get description;
+
+  @BuiltValueField(wireName: r'vision')
+  String? get vision;
+
+  @BuiltValueField(wireName: r'mission')
+  String? get mission;
+
+  @BuiltValueField(wireName: r'has_logo')
+  bool? get hasLogo;
+
   @BuiltValueField(wireName: r'created_at')
   DateTime? get createdAt;
 
@@ -40,7 +56,7 @@ abstract class Organization
   factory Organization([void updates(OrganizationBuilder b)]) = _$Organization;
 
   @BuiltValueHook(initializeBuilder: true)
-  static void _defaults(OrganizationBuilder b) => b;
+  static void _defaults(OrganizationBuilder b) => b..hasLogo = false;
 
   @BuiltValueSerializer(custom: true)
   static Serializer<Organization> get serializer => _$OrganizationSerializer();
@@ -78,6 +94,34 @@ class _$OrganizationSerializer implements PrimitiveSerializer<Organization> {
       object.ownerId,
       specifiedType: const FullType(int),
     );
+    if (object.description != null) {
+      yield r'description';
+      yield serializers.serialize(
+        object.description,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
+    if (object.vision != null) {
+      yield r'vision';
+      yield serializers.serialize(
+        object.vision,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
+    if (object.mission != null) {
+      yield r'mission';
+      yield serializers.serialize(
+        object.mission,
+        specifiedType: const FullType.nullable(String),
+      );
+    }
+    if (object.hasLogo != null) {
+      yield r'has_logo';
+      yield serializers.serialize(
+        object.hasLogo,
+        specifiedType: const FullType(bool),
+      );
+    }
     if (object.createdAt != null) {
       yield r'created_at';
       yield serializers.serialize(
@@ -137,6 +181,37 @@ class _$OrganizationSerializer implements PrimitiveSerializer<Organization> {
             specifiedType: const FullType(int),
           ) as int;
           result.ownerId = valueDes;
+          break;
+        case r'description':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.description = valueDes;
+          break;
+        case r'vision':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.vision = valueDes;
+          break;
+        case r'mission':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.mission = valueDes;
+          break;
+        case r'has_logo':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.hasLogo = valueDes;
           break;
         case r'created_at':
           final valueDes = serializers.deserialize(
