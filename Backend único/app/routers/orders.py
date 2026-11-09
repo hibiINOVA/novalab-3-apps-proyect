@@ -1,17 +1,21 @@
-"""Pedidos: lista, detalle, creación y cambio manual de estado (P-07/P-08)."""
+"""Pedidos: lista, detalle, creación y cambio manual de estado (P-07/P-08).
+
+Multi-tenant: folio por organización (`NL-1001` puede repetirse entre
+orgs) y todos los queries filtran por la org activa del usuario."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_current_user
+from app.deps import get_current_org
 from app.events import hub
 from app.models import (
     Customer,
     Order,
     OrderItem,
     OrderStatusHistory,
+    Organization,
     Product,
 )
 from app.schemas import (
@@ -26,7 +30,6 @@ from app.schemas import (
     StatusHistoryEntry,
 )
 from app.security import new_tracking_token, random_folio
-from app.services.queue import bump_version
 from app.services.state_machine import (
     can_transition,
     derive_status,
@@ -34,6 +37,14 @@ from app.services.state_machine import (
 )
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
+
+
+def _get_owned_order(db: Session, org: Organization, order_id: int) -> Order:
+    order = db.get(Order, order_id)
+    if order is None or order.organization_id != org.id:
+        raise HTTPException(404, {"code": "not_found",
+                                  "message": "Pedido no encontrado."})
+    return order
 
 
 def _summary(db: Session, order: Order) -> OrderSummary:
@@ -110,7 +121,7 @@ def _detail(db: Session, order: Order) -> OrderDetail:
 @router.get("", operation_id="listOrders", response_model=list[OrderSummary])
 def list_orders(
     db: Session = Depends(get_db),
-    _user=Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
     status: OrderStatus | None = None,
     customer_id: int | None = None,
     q: str | None = Query(default=None, description="Búsqueda folio/cliente"),
@@ -118,7 +129,11 @@ def list_orders(
     date_to: str | None = None,
     due: DueState | None = None,
 ):
-    query = select(Order).order_by(Order.created_at.desc())
+    query = (
+        select(Order)
+        .where(Order.organization_id == org.id)
+        .order_by(Order.created_at.desc())
+    )
     if customer_id is not None:
         query = query.where(Order.customer_id == customer_id)
     if q:
@@ -140,14 +155,17 @@ def list_orders(
 async def create_order(
     body: OrderCreateRequest,
     db: Session = Depends(get_db),
-    _user=Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
 ):
     # Cliente por id o por nombre (crea uno nuevo si hace falta).
     customer = None
     if body.customer_id is not None:
         customer = db.get(Customer, body.customer_id)
+        if customer is not None and customer.organization_id != org.id:
+            customer = None  # no existe en esta org → tratar como inválido
     elif body.customer_name:
         customer = Customer(
+            organization_id=org.id,
             name=body.customer_name, phone=body.customer_phone
         )
         db.add(customer)
@@ -157,9 +175,13 @@ async def create_order(
             422, {"code": "invalid", "message": "Se requiere un cliente."}
         )
 
-    next_id = db.scalar(select(func.count(Order.id))) + 1
+    # Folio secuencial por organización.
+    next_id = db.scalar(
+        select(func.count(Order.id)).where(Order.organization_id == org.id)
+    ) + 1
     order = Order(
         folio=random_folio(next_id),
+        organization_id=org.id,
         customer_id=customer.id,
         promised_date=body.promised_date,
         notes=body.notes,
@@ -174,12 +196,13 @@ async def create_order(
     position = 0
     for inp in body.items:
         product = db.get(Product, inp.product_id)
-        if product is None:
+        if product is None or product.organization_id != org.id:
             raise HTTPException(
                 422, {"code": "invalid",
                       "message": f"Producto {inp.product_id} no existe."}
             )
         item = OrderItem(
+            organization_id=org.id,
             order_id=order.id,
             product_id=inp.product_id,
             color=inp.color,
@@ -192,21 +215,19 @@ async def create_order(
         if body.total is None:
             total += (product.base_price or 0.0) * inp.quantity
     order.total = total
-    db.add(OrderStatusHistory(order_id=order.id, status="confirmed"))
+    db.add(OrderStatusHistory(organization_id=org.id, order_id=order.id,
+                              status="confirmed"))
     db.flush()
-    await hub.broadcast("order.created", "order", order.id)
-    await hub.broadcast("queue.updated", "queue")
+    await hub.broadcast("order.created", "order", order.id, org_id=org.id)
+    await hub.broadcast("queue.updated", "queue", org_id=org.id)
     return _detail(db, order)
 
 
 @router.get("/{order_id}", operation_id="getOrder",
             response_model=OrderDetail)
 def get_order(order_id: int, db: Session = Depends(get_db),
-              _user=Depends(get_current_user)):
-    order = db.get(Order, order_id)
-    if order is None:
-        raise HTTPException(404, {"code": "not_found",
-                                  "message": "Pedido no encontrado."})
+              org: Organization = Depends(get_current_org)):
+    order = _get_owned_order(db, org, order_id)
     return _detail(db, order)
 
 
@@ -216,12 +237,9 @@ async def update_status(
     order_id: int,
     body: OrderStatusUpdateRequest,
     db: Session = Depends(get_db),
-    _user=Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
 ):
-    order = db.get(Order, order_id)
-    if order is None:
-        raise HTTPException(404, {"code": "not_found",
-                                  "message": "Pedido no encontrado."})
+    order = _get_owned_order(db, org, order_id)
     items = db.scalars(
         select(OrderItem).where(OrderItem.order_id == order.id)
     ).all()
@@ -244,9 +262,10 @@ async def update_status(
 
         order.delivered_at = _date.today()
     db.add(OrderStatusHistory(
+        organization_id=org.id,
         order_id=order.id, status=new_status, previous_status=current
     ))
     db.flush()
     await hub.broadcast("order.updated", "order", order.id,
-                        {"status": new_status})
+                        {"status": new_status}, org_id=org.id)
     return _detail(db, order)

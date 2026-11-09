@@ -1049,6 +1049,25 @@ paths:
                   $ref: '#/components/schemas/Product'
         '401':
           $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [products]
+      operationId: createProduct
+      summary: Crear producto en el catálogo de la organización
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreateRequest'
+      responses:
+        '201':
+          description: Producto creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
 # Canal de tiempo real (WebSocket). OpenAPI no describe WebSocket de forma nativa;
 # se documenta mediante extensión para los generadores de clientes.
@@ -1739,6 +1758,39 @@ components:
         base_price:
           type: number
           format: float
+
+    ProductCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        material:
+          type: string
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        estimated_weight_g:
+          type: number
+          format: float
+          nullable: true
+        estimated_minutes:
+          type: integer
+          nullable: true
+        extra_cost:
+          type: number
+          format: float
+          nullable: true
+        has_gcode:
+          type: boolean
+          default: false
+        base_price:
+          type: number
+          format: float
+          default: 0
 
     OrderSummary:
       type: object

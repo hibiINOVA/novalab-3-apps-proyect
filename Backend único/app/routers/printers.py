@@ -1,4 +1,7 @@
-"""Impresoras: CRUD, prueba de conexión (BE-01) y snapshot de cámara."""
+"""Impresoras: CRUD, prueba de conexión (BE-01) y snapshot de cámara.
+
+Multi-tenant: cada endpoint resuelve la org activa del usuario y solo
+opera con impresoras de esa organización (404 si es de otra org)."""
 
 import json
 
@@ -7,9 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_current_user
+from app.deps import get_current_org, get_current_user
 from app.events import hub
-from app.models import OrderItem, Printer
+from app.models import OrderItem, Organization, Printer
 from app.schemas import (
     OrderRef,
     Printer as PrinterSchema,
@@ -25,6 +28,17 @@ from app.services.camera import get_snapshot
 from app.services.state_machine import derive_status  # noqa: F401 (deriva order ref)
 
 router = APIRouter(prefix="/api/printers", tags=["printers"])
+
+
+def _get_owned_printer(db: Session, org: Organization,
+                       printer_id: int) -> Printer:
+    """Impresora de la org activa; 404 si no existe o es de otra org."""
+    printer = db.get(Printer, printer_id)
+    if printer is None or printer.organization_id != org.id:
+        raise HTTPException(
+            404, {"code": "not_found", "message": "Impresora no encontrada."}
+        )
+    return printer
 
 
 def _order_ref(db: Session, printer_id: int) -> OrderRef | None:
@@ -92,17 +106,24 @@ async def _test_octoprint(url: str, api_key: str | None) -> PrinterConnectionTes
         return PrinterConnectionTest(ok=False, message=str(exc))
 
 
-@router.get("", operation_id="listPrinters", response_model=list[PrinterSchema],
-            dependencies=[Depends(get_current_user)])
-def list_printers(db: Session = Depends(get_db)):
-    printers = db.scalars(select(Printer).order_by(Printer.id)).all()
+@router.get("", operation_id="listPrinters", response_model=list[PrinterSchema])
+def list_printers(org: Organization = Depends(get_current_org),
+                  db: Session = Depends(get_db)):
+    printers = db.scalars(
+        select(Printer)
+        .where(Printer.organization_id == org.id)
+        .order_by(Printer.id)
+    ).all()
     return [to_printer_schema(db, p) for p in printers]
 
 
 @router.post("", operation_id="createPrinter", response_model=PrinterSchema,
-             status_code=201, dependencies=[Depends(get_current_user)])
-async def create_printer(body: PrinterCreateRequest, db: Session = Depends(get_db)):
+             status_code=201)
+async def create_printer(body: PrinterCreateRequest,
+                         org: Organization = Depends(get_current_org),
+                         db: Session = Depends(get_db)):
     printer = Printer(
+        organization_id=org.id,
         name=body.name,
         model=body.model,
         octoprint_url=body.octoprint_url,
@@ -115,25 +136,27 @@ async def create_printer(body: PrinterCreateRequest, db: Session = Depends(get_d
     )
     db.add(printer)
     db.flush()
-    await hub.broadcast("printer.created", "printer", printer.id)
+    await hub.broadcast("printer.created", "printer", printer.id,
+                        org_id=org.id)
     return to_printer_schema(db, printer)
 
 
 @router.post("/test", operation_id="testPrinterConnection",
-             response_model=PrinterConnectionTest,
-             dependencies=[Depends(get_current_user)])
-async def test_connection(body: PrinterConnectionTestRequest):
+             response_model=PrinterConnectionTest)
+async def test_connection(body: PrinterConnectionTestRequest,
+                          _user=Depends(get_current_user)):
     """BE-01: probar URL + API key antes de dar de alta la impresora."""
     return await _test_octoprint(body.octoprint_url, body.api_key)
 
 
 @router.post("/{printer_id}/test", operation_id="testPrinterConnectionById",
-             response_model=PrinterConnectionTest,
-             dependencies=[Depends(get_current_user)])
-async def test_connection_stored(printer_id: int, db: Session = Depends(get_db)):
+             response_model=PrinterConnectionTest)
+async def test_connection_stored(printer_id: int,
+                                 org: Organization = Depends(get_current_org),
+                                 db: Session = Depends(get_db)):
     """BE-01: probar la conexión guardada de una impresora existente."""
-    printer = db.get(Printer, printer_id)
-    if printer is None or not printer.octoprint_url:
+    printer = _get_owned_printer(db, org, printer_id)
+    if not printer.octoprint_url:
         raise HTTPException(
             404,
             {"code": "not_found",
@@ -143,21 +166,21 @@ async def test_connection_stored(printer_id: int, db: Session = Depends(get_db))
     return await _test_octoprint(printer.octoprint_url, api_key)
 
 
-@router.get("/{printer_id}", operation_id="getPrinter", response_model=PrinterSchema,
-            dependencies=[Depends(get_current_user)])
-def get_printer(printer_id: int, db: Session = Depends(get_db)):
-    printer = db.get(Printer, printer_id)
-    if printer is None:
-        raise HTTPException(404, {"code": "not_found", "message": "Impresora no encontrada."})
+@router.get("/{printer_id}", operation_id="getPrinter",
+            response_model=PrinterSchema)
+def get_printer(printer_id: int,
+                org: Organization = Depends(get_current_org),
+                db: Session = Depends(get_db)):
+    printer = _get_owned_printer(db, org, printer_id)
     return to_printer_schema(db, printer)
 
 
-@router.patch("/{printer_id}", operation_id="updatePrinter", response_model=PrinterSchema,
-              dependencies=[Depends(get_current_user)])
-async def update_printer(printer_id: int, body: PrinterUpdateRequest, db: Session = Depends(get_db)):
-    printer = db.get(Printer, printer_id)
-    if printer is None:
-        raise HTTPException(404, {"code": "not_found", "message": "Impresora no encontrada."})
+@router.patch("/{printer_id}", operation_id="updatePrinter",
+              response_model=PrinterSchema)
+async def update_printer(printer_id: int, body: PrinterUpdateRequest,
+                         org: Organization = Depends(get_current_org),
+                         db: Session = Depends(get_db)):
+    printer = _get_owned_printer(db, org, printer_id)
     if body.name is not None:
         printer.name = body.name
     if body.model is not None:
@@ -177,19 +200,24 @@ async def update_printer(printer_id: int, body: PrinterUpdateRequest, db: Sessio
     if body.state is not None:
         printer.state = body.state.value
     db.flush()
-    await hub.broadcast("printer.updated", "printer", printer.id)
+    await hub.broadcast("printer.updated", "printer", printer.id,
+                        org_id=org.id)
     return to_printer_schema(db, printer)
 
 
-@router.delete("/{printer_id}", operation_id="deletePrinter", status_code=204,
-               dependencies=[Depends(get_current_user)])
-async def delete_printer(printer_id: int, db: Session = Depends(get_db)):
-    printer = db.get(Printer, printer_id)
-    if printer is None:
-        raise HTTPException(404, {"code": "not_found", "message": "Impresora no encontrada."})
-    
+@router.delete("/{printer_id}", operation_id="deletePrinter", status_code=204)
+async def delete_printer(printer_id: int,
+                         org: Organization = Depends(get_current_org),
+                         db: Session = Depends(get_db)):
+    printer = _get_owned_printer(db, org, printer_id)
+
     # Desasignar items de cola asociados si estuvieran en esta impresora
-    items = db.scalars(select(OrderItem).where(OrderItem.printer_id == printer_id)).all()
+    items = db.scalars(
+        select(OrderItem).where(
+            OrderItem.organization_id == org.id,
+            OrderItem.printer_id == printer_id,
+        )
+    ).all()
     for item in items:
         item.printer_id = None
         if item.state == "printing":
@@ -197,24 +225,22 @@ async def delete_printer(printer_id: int, db: Session = Depends(get_db)):
 
     db.delete(printer)
     db.flush()
-    await hub.broadcast("printer.deleted", "printer", printer_id)
-    await hub.broadcast("queue.updated", "queue")
+    await hub.broadcast("printer.deleted", "printer", printer_id,
+                        org_id=org.id)
+    await hub.broadcast("queue.updated", "queue", org_id=org.id)
     return Response(status_code=204)
 
 
 @router.get("/{printer_id}/camera/snapshot",
-            operation_id="getPrinterCameraSnapshot",
-            dependencies=[Depends(get_current_user)])
+            operation_id="getPrinterCameraSnapshot")
 def camera_snapshot(printer_id: int, index: int = 0,
+                    org: Organization = Depends(get_current_org),
                     db: Session = Depends(get_db)):
     """BE-09: el cliente recibe el snapshot del backend, nunca la IP.
 
     `index` selecciona la cámara (0 = principal; BE-07 multi-cámara).
     """
-    printer = db.get(Printer, printer_id)
-    if printer is None:
-        raise HTTPException(404, {"code": "not_found",
-                                  "message": "Impresora no encontrada."})
+    printer = _get_owned_printer(db, org, printer_id)
     data = get_snapshot(db, printer_id, index=index)
     if data is None:
         return Response(status_code=204)

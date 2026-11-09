@@ -1,6 +1,9 @@
-"""Seed de datos demo (dueno/operador, impresoras, cola, pedidos).
+"""Seed de datos demo (dueno/operador, org, impresoras, cola, pedidos).
 
-Ejecuta `python -m app.seed` o llama `seed_demo()` desde el lifespan."""
+Ejecuta `python -m app.seed` o llama `seed_demo()` desde el lifespan.
+
+Multi-tenant: todo el dato demo queda en la organización `NOVALAB`
+(org del dueño demo); una org nueva arranca vacía."""
 
 from datetime import UTC, date, datetime, timedelta
 
@@ -13,6 +16,8 @@ from app.models import (
     Order,
     OrderItem,
     OrderStatusHistory,
+    Organization,
+    OrganizationMember,
     PrintJob,
     Printer,
     Product,
@@ -38,39 +43,60 @@ def seed_demo(db: Session) -> None:
     db.add_all([owner, operator])
     db.flush()
 
-    # --- negocio / branding ---
-    business = Business(business_name="NOVALAB", currency="MXN",
-                        timezone="America/Mexico_City", language="es-MX",
-                        electricity_tariff_kwh=4.5, printer_kw=0.15,
-                        monthly_goal=50000.0)
+    # --- organización demo (multi-tenant: dueño + operador activos) ---
+    org = Organization(code="ORG-NOVA-101", name="NOVALAB", owner_id=owner.id)
+    db.add(org)
+    db.flush()
+    owner.organization_id = org.id
+    owner.membership_status = "active"
+    operator.organization_id = org.id
+    operator.membership_status = "active"
+    db.add_all([
+        OrganizationMember(user_id=owner.id, organization_id=org.id,
+                           status="active"),
+        OrganizationMember(user_id=operator.id, organization_id=org.id,
+                           status="active"),
+    ])
+    db.flush()
+
+    # --- negocio / branding (por org) ---
+    business = Business(organization_id=org.id, business_name="NOVALAB",
+                        currency="MXN", timezone="America/Mexico_City",
+                        language="es-MX", electricity_tariff_kwh=4.5,
+                        printer_kw=0.15, monthly_goal=50000.0)
     db.add(business)
 
     # --- spools (BE-16) ---
-    spool_petg_blue = Spool(material="PETG", color="Azul", grams_total=1000,
+    spool_petg_blue = Spool(organization_id=org.id, material="PETG",
+                            color="Azul", grams_total=1000,
                             grams_remaining=620, cost_per_kg=420.0)
-    spool_petg_black = Spool(material="PETG", color="Negro", grams_total=1000,
+    spool_petg_black = Spool(organization_id=org.id, material="PETG",
+                             color="Negro", grams_total=1000,
                              grams_remaining=810, cost_per_kg=400.0)
-    spool_pla_white = Spool(material="PLA", color="Blanco", grams_total=1000,
+    spool_pla_white = Spool(organization_id=org.id, material="PLA",
+                            color="Blanco", grams_total=1000,
                             grams_remaining=450, cost_per_kg=380.0)
     db.add_all([spool_petg_blue, spool_petg_black, spool_pla_white])
     db.flush()
 
     # --- impresoras (BE-01..BE-03) ---
-    p1 = Printer(name="Prusa MK4", model="Prusa MK4",
+    p1 = Printer(organization_id=org.id, name="Prusa MK4", model="Prusa MK4",
                  octoprint_url="http://192.168.1.40",
                  snapshot_url=None, bed_width=250, bed_depth=210,
                  state="idle", camera_available=True,
                  loaded_spool_id=spool_petg_blue.id,
                  nozzle_temp=24.0, nozzle_target=0.0, bed_temp=23.0,
                  bed_target=0.0, last_seen=datetime.now(UTC))
-    p2 = Printer(name="Ender 3 V3", model="Creality Ender 3 V3",
+    p2 = Printer(organization_id=org.id, name="Ender 3 V3",
+                 model="Creality Ender 3 V3",
                  octoprint_url="http://192.168.1.41",
                  snapshot_url=None, bed_width=220, bed_depth=220,
                  state="idle", camera_available=True,
                  loaded_spool_id=spool_petg_black.id,
                  nozzle_temp=22.0, nozzle_target=0.0, bed_temp=22.0,
                  bed_target=0.0, last_seen=datetime.now(UTC))
-    p3 = Printer(name="Bambu Lab A1", model="Bambu Lab A1",
+    p3 = Printer(organization_id=org.id, name="Bambu Lab A1",
+                 model="Bambu Lab A1",
                  octoprint_url=None,
                  snapshot_url=None, bed_width=256, bed_depth=256,
                  state="offline", camera_available=False,
@@ -80,20 +106,24 @@ def seed_demo(db: Session) -> None:
 
     # --- productos ---
     products = [
-        Product(name="Portavasos hexagonal", material="PETG", color="Azul",
+        Product(organization_id=org.id, name="Portavasos hexagonal",
+                material="PETG", color="Azul",
                 estimated_weight_g=28, estimated_minutes=35,
                 base_price=120.0, has_gcode=True),
-        Product(name="Llavero personalizado", material="PLA", color="Blanco",
+        Product(organization_id=org.id, name="Llavero personalizado",
+                material="PLA", color="Blanco",
                 estimated_weight_g=8, estimated_minutes=15,
                 base_price=80.0, has_gcode=True),
-        Product(name="Soporte de celular", material="PETG", color="Negro",
+        Product(organization_id=org.id, name="Soporte de celular",
+                material="PETG", color="Negro",
                 estimated_weight_g=45, estimated_minutes=55,
                 base_price=180.0, has_gcode=True),
-        Product(name="Maceta pequeña", material="PLA", color="Blanco",
+        Product(organization_id=org.id, name="Maceta pequeña",
+                material="PLA", color="Blanco",
                 estimated_weight_g=60, estimated_minutes=75,
                 base_price=220.0, has_gcode=True),
-        Product(name="Organizador de escritorio", material="PETG",
-                color="Negro", estimated_weight_g=120,
+        Product(organization_id=org.id, name="Organizador de escritorio",
+                material="PETG", color="Negro", estimated_weight_g=120,
                 estimated_minutes=150, base_price=350.0, has_gcode=True),
     ]
     db.add_all(products)
@@ -101,15 +131,16 @@ def seed_demo(db: Session) -> None:
 
     # --- clientes ---
     customers = [
-        Customer(name="Ana López", phone="55 1234 5678",
-                 email="ana@example.com"),
-        Customer(name="Carlos Méndez", phone="55 2345 6789",
-                 email="carlos@example.com"),
-        Customer(name="Sofía Ramírez", phone="55 3456 7890",
-                 email="sofia@example.com"),
-        Customer(name="Luis Torres", phone="55 4567 8901"),
-        Customer(name="Mariana Cruz", phone="55 5678 9012",
-                 email="mariana@example.com"),
+        Customer(organization_id=org.id, name="Ana López",
+                 phone="55 1234 5678", email="ana@example.com"),
+        Customer(organization_id=org.id, name="Carlos Méndez",
+                 phone="55 2345 6789", email="carlos@example.com"),
+        Customer(organization_id=org.id, name="Sofía Ramírez",
+                 phone="55 3456 7890", email="sofia@example.com"),
+        Customer(organization_id=org.id, name="Luis Torres",
+                 phone="55 4567 8901"),
+        Customer(organization_id=org.id, name="Mariana Cruz",
+                 phone="55 5678 9012", email="mariana@example.com"),
     ]
     db.add_all(customers)
     db.flush()
@@ -128,6 +159,7 @@ def seed_demo(db: Session) -> None:
               due_days) in enumerate(orders_spec, start=1001):
         order = Order(
             folio=f"NL-{idx}",
+            organization_id=org.id,
             customer_id=customers[c_idx].id,
             promised_date=today + timedelta(days=due_days),
             total=products[prod_idx].base_price * qty,
@@ -138,6 +170,7 @@ def seed_demo(db: Session) -> None:
         db.add(order)
         db.flush()
         item = OrderItem(
+            organization_id=org.id,
             order_id=order.id,
             product_id=products[prod_idx].id,
             quantity=qty,
@@ -149,11 +182,13 @@ def seed_demo(db: Session) -> None:
         )
         db.add(item)
         db.flush()
-        db.add(OrderStatusHistory(order_id=order.id, status="confirmed",
-                                       occurred_at=order.created_at))
+        db.add(OrderStatusHistory(organization_id=org.id, order_id=order.id,
+                                  status="confirmed",
+                                  occurred_at=order.created_at))
         # Job de impresión para items en cola/imprimiendo/fallidos.
         if state in ("queued", "printing", "failed"):
             job = PrintJob(
+                organization_id=org.id,
                 item_id=item.id,
                 printer_id=printer_id,
                 state="printing" if state == "printing" else (
@@ -167,7 +202,8 @@ def seed_demo(db: Session) -> None:
             )
             db.add(job)
 
-    # --- estado interno: versión de cola ---
-    db.add(Setting(key="queue_version", value="1"))
+    # --- estado interno: versión de cola (por org) ---
+    db.add(Setting(key=f"queue_version:{org.id}", value="1"))
     db.commit()
-    print("Seed demo: usuarios, 3 impresoras, 5 productos, 5 pedidos.")
+    print("Seed demo: org NOVALAB, usuarios, 3 impresoras, 5 productos, "
+          "5 pedidos.")

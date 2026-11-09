@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_current_user, require_owner
 from app.models import (
+    Business,
     Organization,
     OrganizationMember,
     User,
@@ -109,6 +110,8 @@ def create_organization(
                        mission=_clean(body.mission))
     db.add(org)
     db.flush()  # asigna org.id
+    # Branding/config por defecto de la nueva org (multi-tenant).
+    db.add(Business(organization_id=org.id, business_name=name))
     db.add(
         OrganizationMember(
             user_id=user.id,

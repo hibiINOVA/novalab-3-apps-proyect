@@ -39,6 +39,7 @@ doc/PrinterState.md
 doc/PrinterUpdateRequest.md
 doc/PrintersApi.md
 doc/Product.md
+doc/ProductCreateRequest.md
 doc/ProductsApi.md
 doc/PublicApi.md
 doc/PublicLookupRequest.md
@@ -113,6 +114,7 @@ lib/src/model/printer_create_request.dart
 lib/src/model/printer_state.dart
 lib/src/model/printer_update_request.dart
 lib/src/model/product.dart
+lib/src/model/product_create_request.dart
 lib/src/model/public_lookup_request.dart
 lib/src/model/public_lookup_response.dart
 lib/src/model/queue.dart
@@ -135,5 +137,4 @@ lib/src/model/user.dart
 lib/src/model/user_organization_status.dart
 lib/src/serializers.dart
 pubspec.yaml
-test/printer_connection_test_request_test.dart
-test/printer_connection_test_test.dart
+test/product_create_request_test.dart

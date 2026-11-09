@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novalab_api/novalab_api.dart';
 import 'package:produccion/core/api/api_client_factory.dart';
+import 'package:produccion/core/api/mock/mock_backend.dart';
 import 'package:produccion/core/config/app_config.dart';
 
 void main() {
@@ -253,6 +254,141 @@ void main() {
           .approveOrganizationRequest(requestId: req.id);
       expect(approveRes.statusCode, 200);
       expect(approveRes.data!.status, MembershipStatus.active);
+    });
+  });
+
+  group('multi-tenant: aislamiento por organización', () {
+    test('org nueva arranca vacía; el dueño demo conserva sus datos', () async {
+      // Sesión inicial (sin login): org sembrada → datos del demo.
+      final seedPrinters = await api.getPrintersApi().listPrinters();
+      expect(seedPrinters.data, hasLength(3));
+      final seedOrders = await api.getOrdersApi().listOrders();
+      expect(seedOrders.data, hasLength(5));
+
+      // Dueño nuevo crea su organización → ve listas vacías.
+      await api.getAuthApi().register(
+        registerRequest: RegisterRequest(
+          (b) => b
+            ..name = 'Dueño Nuevo'
+            ..email = 'nuevo.mt@ejemplo.mx'
+            ..password = 'secreta123'
+            ..role = Role.owner,
+        ),
+      );
+      await api.getOrganizationsApi().createOrganization(
+        organizationCreateRequest: OrganizationCreateRequest(
+          (b) => b..name = 'Taller Multi',
+        ),
+      );
+
+      final emptyPrinters = await api.getPrintersApi().listPrinters();
+      expect(emptyPrinters.data, isEmpty);
+      final emptyOrders = await api.getOrdersApi().listOrders();
+      expect(emptyOrders.data, isEmpty);
+      final emptyQueue = await api.getQueueApi().getQueue();
+      expect(emptyQueue.data!.unassigned, isEmpty);
+
+      // Detalle de un pedido ajeno → 404.
+      try {
+        await api.getOrdersApi().getOrder(orderId: 1001);
+        fail('Se esperaba 404 para pedido de otra org');
+      } on DioException catch (e) {
+        expect(e.response?.statusCode, 404);
+      }
+
+      // Vuelve la sesión del dueño demo → sus datos siguen intactos.
+      await api.getAuthApi().login(
+        loginRequest: LoginRequest(
+          (b) => b
+            ..email = kMockOwnerEmail
+            ..password = kMockPassword,
+        ),
+      );
+      final backPrinters = await api.getPrintersApi().listPrinters();
+      expect(backPrinters.data, hasLength(3));
+      final backOrders = await api.getOrdersApi().listOrders();
+      expect(backOrders.data, hasLength(5));
+    });
+
+    test('folio por org: la org nueva empieza en NL-1', () async {
+      await api.getAuthApi().register(
+        registerRequest: RegisterRequest(
+          (b) => b
+            ..name = 'Dueño Folio'
+            ..email = 'folio.mt@ejemplo.mx'
+            ..password = 'secreta123'
+            ..role = Role.owner,
+        ),
+      );
+      await api.getOrganizationsApi().createOrganization(
+        organizationCreateRequest: OrganizationCreateRequest(
+          (b) => b..name = 'Taller Folios',
+        ),
+      );
+
+      final product = await api.getProductsApi().createProduct(
+        productCreateRequest: ProductCreateRequest(
+          (b) => b
+            ..name = 'Llavero MT'
+            ..basePrice = 50.0
+            ..estimatedMinutes = 10,
+        ),
+      );
+      expect(product.statusCode, 201);
+
+      final order = await api.getOrdersApi().createOrder(
+        orderCreateRequest: OrderCreateRequest(
+          (b) => b
+            ..customerName = 'Cliente MT'
+            ..items = ListBuilder(<OrderItemInput>[
+              OrderItemInput(
+                (i) => i
+                  ..productId = product.data!.id
+                  ..quantity = 1,
+              ),
+            ]),
+        ),
+      );
+      expect(order.statusCode, 201);
+      // Conteo por org: primera orden de la org nueva → NL-1.
+      expect(order.data!.folio, 'NL-1');
+
+      // El pedido del demo (NL-1001..) no cambió.
+      await api.getAuthApi().login(
+        loginRequest: LoginRequest(
+          (b) => b
+            ..email = kMockOwnerEmail
+            ..password = kMockPassword,
+        ),
+      );
+      final demoOrders = await api.getOrdersApi().listOrders(q: 'NL-1001');
+      expect(demoOrders.data, hasLength(1));
+    });
+
+    test('crear producto u orden sin org activa da 403', () async {
+      // Registro deja al usuario sin organización activa.
+      await api.getAuthApi().register(
+        registerRequest: RegisterRequest(
+          (b) => b
+            ..name = 'Sin Org'
+            ..email = 'sinorg.mt@ejemplo.mx'
+            ..password = 'secreta123'
+            ..role = Role.owner,
+        ),
+      );
+
+      try {
+        await api.getProductsApi().createProduct(
+          productCreateRequest: ProductCreateRequest(
+            (b) => b
+              ..name = 'Producto Huérfano'
+              ..basePrice = 10.0,
+          ),
+        );
+        fail('Se esperaba 403 por membresía inactiva');
+      } on DioException catch (e) {
+        expect(e.response?.statusCode, 403);
+      }
     });
   });
 }

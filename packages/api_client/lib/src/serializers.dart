@@ -46,6 +46,7 @@ import 'package:novalab_api/src/model/printer_create_request.dart';
 import 'package:novalab_api/src/model/printer_state.dart';
 import 'package:novalab_api/src/model/printer_update_request.dart';
 import 'package:novalab_api/src/model/product.dart';
+import 'package:novalab_api/src/model/product_create_request.dart';
 import 'package:novalab_api/src/model/public_lookup_request.dart';
 import 'package:novalab_api/src/model/public_lookup_response.dart';
 import 'package:novalab_api/src/model/queue.dart';
@@ -103,6 +104,7 @@ part 'serializers.g.dart';
   PrinterState,
   PrinterUpdateRequest,
   Product,
+  ProductCreateRequest,
   PublicLookupRequest,
   PublicLookupResponse,
   Queue,

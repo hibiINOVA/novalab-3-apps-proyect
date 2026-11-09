@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import User
+from app.models import Organization, User
 from app.ratelimit import (
     login_limiter,
     lookup_limiter,
@@ -50,6 +50,34 @@ def require_owner(user: User = Depends(get_current_user)) -> User:
             detail={"code": "forbidden", "message": "Requiere rol owner."},
         )
     return user
+
+
+def get_current_org(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> Organization:
+    """Org activa del usuario multi-tenant.
+
+    Los recursos operativos se consultan siempre con la org resuelta
+    aquí (desde el JWT → user.organization_id); exige membresía `active`.
+    """
+    if user.organization_id is None or user.membership_status != "active":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "membership_not_active",
+                "message": "No perteneces a una organización activa.",
+            },
+        )
+    org = db.get(Organization, user.organization_id)
+    if org is None:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "membership_not_active",
+                "message": "La organización ya no existe.",
+            },
+        )
+    return org
 
 
 def _client_ip(request: Request) -> str:

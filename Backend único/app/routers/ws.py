@@ -2,7 +2,10 @@
 
 El backend envía un evento `session.ready` de bienvenida para que el cliente
 sepa que la conexión está activa (el cliente Dart solo marca `connected`
-tras recibir el primer mensaje)."""
+tras recibir el primer mensaje).
+
+Multi-tenant: la conexión queda ligada a la `organization_id` del
+usuario; los broadcasts solo se envían a los clientes de esa org."""
 
 import json
 
@@ -11,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session_factory
 from app.events import hub
+from app.models import User
 from app.security import decode_token
 
 router = APIRouter()
@@ -26,12 +30,20 @@ async def ws_endpoint(websocket: WebSocket, token: str = Query(default="")):
     if payload is None:
         await websocket.close(code=4401, reason="unauthorized")
         return
-    await hub.connect(websocket)
+    org_id: int | None = None
+    db = _open_db()
+    try:
+        user = db.get(User, int(payload["sub"]))
+        if user is not None and user.membership_status == "active":
+            org_id = user.organization_id
+    finally:
+        db.close()
+    await hub.connect(websocket, org_id)
     # Bienvenida: el cliente Dart necesita un primer mensaje para confirmar.
     await websocket.send_text(json.dumps({
         "type": "session.ready",
         "entity": "session",
-        "payload": {"user_id": int(payload["sub"])},
+        "payload": {"user_id": int(payload["sub"]), "organization_id": org_id},
     }, ensure_ascii=False))
     try:
         while True:

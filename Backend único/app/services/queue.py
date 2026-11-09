@@ -1,5 +1,8 @@
 """Lógica de cola: construcción, reorden, sugerencia (BE-11..BE-14) y
-aceptación. Toda decisión vive en el backend."""
+aceptación. Toda decisión vive en el backend.
+
+Multi-tenant: todas las funciones reciben `organization_id` y solo
+operan sobre datos de esa organización."""
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,19 +18,23 @@ from app.schemas import (
 from app.services.state_machine import due_state
 
 
-def get_version(db: Session) -> int:
-    row = db.get(Setting, "queue_version")
+def _version_key(org_id: int) -> str:
+    return f"queue_version:{org_id}"
+
+
+def get_version(db: Session, org_id: int) -> int:
+    row = db.get(Setting, _version_key(org_id))
     if row is None:
-        row = Setting(key="queue_version", value="1")
+        row = Setting(key=_version_key(org_id), value="1")
         db.add(row)
         db.flush()
     return int(row.value)
 
 
-def bump_version(db: Session) -> int:
-    row = db.get(Setting, "queue_version")
+def bump_version(db: Session, org_id: int) -> int:
+    row = db.get(Setting, _version_key(org_id))
     if row is None:
-        row = Setting(key="queue_version", value="1")
+        row = Setting(key=_version_key(org_id), value="1")
         db.add(row)
     row.value = str(int(row.value) + 1)
     db.flush()
@@ -57,9 +64,12 @@ def _to_queue_item(item: OrderItem) -> QueueItem:
 ACTIVE_STATES = ("pending", "queued", "printing", "failed")
 
 
-def build_queue(db: Session) -> Queue:
+def build_queue(db: Session, org_id: int) -> Queue:
     items = db.scalars(
-        select(OrderItem).where(OrderItem.state.in_(ACTIVE_STATES))
+        select(OrderItem).where(
+            OrderItem.organization_id == org_id,
+            OrderItem.state.in_(ACTIVE_STATES),
+        )
     ).all()
     unassigned: list[QueueItem] = []
     by_printer: dict[str, list[QueueItem]] = {}
@@ -73,16 +83,19 @@ def build_queue(db: Session) -> Queue:
     for key in by_printer:
         by_printer[key].sort(key=lambda i: i.position)
     return Queue(unassigned=unassigned, by_printer=by_printer,
-                 version=get_version(db))
+                 version=get_version(db, org_id))
 
 
-def check_version(db: Session, client_version: int) -> bool:
-    return client_version == get_version(db)
+def check_version(db: Session, org_id: int, client_version: int) -> bool:
+    return client_version == get_version(db, org_id)
 
 
-def _next_position(db: Session, printer_id: int | None) -> int:
+def _next_position(db: Session, org_id: int, printer_id: int | None) -> int:
     """Siguiente posición libre en la impresora (o en 'sin asignar')."""
-    stmt = select(OrderItem).where(OrderItem.state.in_(ACTIVE_STATES))
+    stmt = select(OrderItem).where(
+        OrderItem.organization_id == org_id,
+        OrderItem.state.in_(ACTIVE_STATES),
+    )
     if printer_id is None:
         stmt = stmt.where(OrderItem.printer_id.is_(None))
     else:
@@ -91,26 +104,31 @@ def _next_position(db: Session, printer_id: int | None) -> int:
     return max(positions, default=-1) + 1
 
 
-def apply_entries(db: Session, entries: list[dict]) -> int:
+def apply_entries(db: Session, org_id: int, entries: list[dict]) -> int:
     """Aplica entradas de reorder `{id, printer_id, position}` o de accept
     `{item_id, printer_id}` y devuelve la nueva versión.
 
     En accept (sin `position`) el item se agrega al final de su impresora.
+    Solo toca items de la organización `org_id`.
     """
     next_pos: dict[str, int] = {}
     for entry in entries:
         item_id = entry.get("item_id", entry.get("id"))
         item = db.get(OrderItem, item_id)
-        if item is None:
+        if item is None or item.organization_id != org_id:
             continue
         printer_id = entry.get("printer_id")
+        if printer_id is not None:
+            printer = db.get(Printer, printer_id)
+            if printer is None or printer.organization_id != org_id:
+                continue
         item.printer_id = printer_id
         position = entry.get("position")
         if position is None:
             # accept: append al final (como el mock, `_nextPosition`).
             key = "" if printer_id is None else str(printer_id)
             if key not in next_pos:
-                next_pos[key] = _next_position(db, printer_id)
+                next_pos[key] = _next_position(db, org_id, printer_id)
             item.position = next_pos[key]
             next_pos[key] += 1
         else:
@@ -120,12 +138,12 @@ def apply_entries(db: Session, entries: list[dict]) -> int:
             item.state = "queued"
         if printer_id is None and item.state == "queued":
             item.state = "pending"
-    version = bump_version(db)
+    version = bump_version(db, org_id)
     db.flush()
     return version
 
 
-def suggest(db: Session) -> QueueSuggestion:
+def suggest(db: Session, org_id: int) -> QueueSuggestion:
     """BE-13/BE-14: propone asignación con explicación legible.
 
     Criterios: urgencia (fecha prometida), compatibilidad material/color del
@@ -133,18 +151,27 @@ def suggest(db: Session) -> QueueSuggestion:
     """
     pending = sorted(
         [i for i in db.scalars(
-            select(OrderItem).where(OrderItem.state == "pending")
+            select(OrderItem).where(
+                OrderItem.organization_id == org_id,
+                OrderItem.state == "pending",
+            )
         ).all() if i.printer_id is None],
         key=lambda i: (i.order.promised_date or date_max(), i.position),
     )
     printers = db.scalars(
-        select(Printer).where(Printer.state != "offline")
+        select(Printer).where(
+            Printer.organization_id == org_id,
+            Printer.state != "offline",
+        )
     ).all()
 
     # Carga actual (minutos) por impresora.
     load: dict[int, float] = {p.id: 0.0 for p in printers}
     for item in db.scalars(
-        select(OrderItem).where(OrderItem.printer_id.is_not(None))
+        select(OrderItem).where(
+            OrderItem.organization_id == org_id,
+            OrderItem.printer_id.is_not(None),
+        )
     ).all():
         if item.printer_id in load:
             minutes = item.estimated_minutes or item.product.estimated_minutes or 0
@@ -222,7 +249,7 @@ def suggest(db: Session) -> QueueSuggestion:
         f"{'item asignado' if len(assignments) == 1 else 'items asignados'}."
     )
     return QueueSuggestion(
-        version=get_version(db),
+        version=get_version(db, org_id),
         summary=summary,
         assignments=assignments,
         unassigned_item_ids=unassigned_ids,

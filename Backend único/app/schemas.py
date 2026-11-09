@@ -362,6 +362,17 @@ class Product(BaseModel):
     base_price: float
 
 
+class ProductCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    material: str | None = None
+    color: str | None = None
+    estimated_weight_g: float | None = None
+    estimated_minutes: int | None = None
+    extra_cost: float | None = None
+    has_gcode: bool = False
+    base_price: float = 0.0
+
+
 # --- pedidos ---------------------------------------------------------------
 class OrderSummary(BaseModel):
     id: int

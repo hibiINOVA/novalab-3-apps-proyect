@@ -1,5 +1,9 @@
 """API pública (BE-21/BE-22): solo datos propios del cliente, nunca costos ni
-otros clientes. Anónima con rate limit (BE-19)."""
+otros clientes. Anónima con rate limit (BE-19).
+
+Multi-tenant: `branding` resuelve la org desde el bearer si el cliente
+está autenticado; sin token, la primera org (para la app de seguimiento
+pública, que no tiene sesión)."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
@@ -7,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.deps import limit_lookup, limit_public
-from app.models import Business, Order, OrderItem
+from app.models import Business, Order, OrderItem, User
 from app.schemas import (
     Branding,
     OrderDetail,
@@ -17,20 +21,46 @@ from app.schemas import (
     Shipment,
     StatusHistoryEntry,
 )
+from app.security import decode_token
 from app.services.camera import get_public_snapshot
 from app.services.state_machine import derive_status, due_state
 
 router = APIRouter(prefix="/api/public", tags=["public"])
 
+_DEFAULT_BRANDING = Branding(
+    business_name="NOVALAB", primary_color="#0B132B",
+    accent_color="#00FF87", background_color="#FFFFFF",
+    currency="MXN", timezone="America/Mexico_City", language="es-MX",
+)
+
+
+def _branding_org_id(request: Request, db: Session) -> int | None:
+    """Org del bearer si es válida y activa; None si no hay sesión."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    payload = decode_token(auth[7:], "access")
+    if payload is None:
+        return None
+    user = db.get(User, int(payload["sub"]))
+    if (user is None or user.organization_id is None
+            or user.membership_status != "active"):
+        return None
+    return user.organization_id
+
 
 @router.get("/branding", operation_id="getBranding", response_model=Branding)
-def branding(db: Session = Depends(get_db), _=Depends(limit_public)):
-    b = db.scalar(select(Business).limit(1))
+def branding(request: Request, db: Session = Depends(get_db),
+             _=Depends(limit_public)):
+    org_id = _branding_org_id(request, db)
+    b = None
+    if org_id is not None:
+        b = db.scalar(select(Business).where(Business.organization_id
+                                             == org_id))
     if b is None:
-        return Branding(business_name="NOVALAB", primary_color="#0B132B",
-                        accent_color="#00FF87", background_color="#FFFFFF",
-                        currency="MXN", timezone="America/Mexico_City",
-                        language="es-MX")
+        b = db.scalar(select(Business).order_by(Business.id).limit(1))
+    if b is None:
+        return _DEFAULT_BRANDING
     return Branding.model_validate(b)
 
 

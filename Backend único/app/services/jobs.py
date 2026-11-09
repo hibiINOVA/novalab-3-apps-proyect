@@ -33,7 +33,7 @@ def complete_job(db: Session, job: PrintJob) -> int:
         printer.progress = None
         printer.remaining_seconds = None
     db.flush()
-    return bump_version(db)
+    return bump_version(db, job.organization_id)
 
 
 def fail_job(db: Session, job: PrintJob, reason: str) -> int:
@@ -51,4 +51,4 @@ def fail_job(db: Session, job: PrintJob, reason: str) -> int:
         printer.progress = None
         printer.remaining_seconds = None
     db.flush()
-    return bump_version(db)
+    return bump_version(db, job.organization_id)

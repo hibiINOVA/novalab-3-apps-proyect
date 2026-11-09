@@ -46,10 +46,16 @@ class MockBackend {
     _reset();
   }
 
-  int _queueVersion = 1;
+  /// Versión de cola por organización (orgId → versión; BE multi-tenant).
+  Map<int, int> _queueVersion = <int, int>{};
+
+  /// Organización activa del usuario simulado; `null` sin membresía activa.
+  int? _currentOrgId;
+
   int _nextJobId = 1;
   int _nextOrderId = 1006;
   int _nextCustomerId = 6;
+  int _nextProductId = 6;
   int _nextItemId = 7;
   int _nextUserId = 3;
   int _nextOrgId = 2;
@@ -80,10 +86,12 @@ class MockBackend {
   late Map<int, ({Uint8List bytes, String ext})> _orgLogos;
 
   void _reset() {
-    _queueVersion = 1;
+    _queueVersion = <int, int>{};
+    _currentOrgId = 1;
     _nextJobId = 1;
     _nextOrderId = 1006;
     _nextCustomerId = 6;
+    _nextProductId = 6;
     _nextItemId = 7;
     _nextUserId = 3;
     _nextOrgId = 2;
@@ -322,6 +330,16 @@ class MockBackend {
         ],
       ),
     };
+    // Datos sembrados: todos pertenecen a la org demo (ORG-NOVA-101).
+    for (final row in <Map<String, Object?>>[
+      ..._printers,
+      ..._queueItems,
+      ..._customers,
+      ..._products,
+      ..._orders.values,
+    ]) {
+      row['organization_id'] = 1;
+    }
   }
 
   static Map<String, Object?> _customer(
@@ -403,12 +421,13 @@ class MockBackend {
     required int position,
     required int minutes,
     required String? promised,
+    String? folio,
   }) {
     return <String, Object?>{
       'id': id,
       'order_id': orderId,
       'product_id': productId,
-      'order_folio': 'NL-$orderId',
+      'order_folio': folio ?? 'NL-$orderId',
       'product_name': product,
       'color': color,
       'quantity': qty,
@@ -531,7 +550,7 @@ class MockBackend {
       case 'GET /api/public/branding':
         return const MockResponse(200, _branding);
       case 'GET /api/printers':
-        return MockResponse(200, _printers);
+        return MockResponse(200, _inCurrentOrg(_printers));
       case 'POST /api/printers':
         return _createPrinter(body);
       case 'POST /api/printers/test':
@@ -547,11 +566,13 @@ class MockBackend {
       case 'POST /api/print-jobs':
         return _startJob(body);
       case 'GET /api/customers':
-        return MockResponse(200, _customers);
+        return MockResponse(200, _inCurrentOrg(_customers));
       case 'POST /api/customers':
         return _createCustomer(body);
       case 'GET /api/products':
-        return MockResponse(200, _products);
+        return MockResponse(200, _inCurrentOrg(_products));
+      case 'POST /api/products':
+        return _createProduct(body);
       case 'GET /api/orders':
         return _listOrders(query ?? const <String, dynamic>{});
       case 'POST /api/orders':
@@ -577,6 +598,7 @@ class MockBackend {
         .firstWhere((u) => u?['email'] == email, orElse: () => null);
     if (existing != null) {
       _currentUserId = existing['id'] as int;
+      _syncOrg();
       return MockResponse(200, <String, Object?>{
         'access_token': 'mock-access-${DateTime.now().millisecondsSinceEpoch}',
         'refresh_token': 'mock-refresh-token',
@@ -584,6 +606,7 @@ class MockBackend {
         'user': existing,
       });
     }
+    _syncOrg();
     return MockResponse(200, _loginResponse(isOperator));
   }
 
@@ -618,6 +641,7 @@ class MockBackend {
       'membership_status': 'none',
     };
     _userOrgMap[id] = userData;
+    _syncOrg();
     return MockResponse(201, <String, Object?>{
       'access_token': 'mock-access-${DateTime.now().millisecondsSinceEpoch}',
       'refresh_token': 'mock-refresh-token',
@@ -691,6 +715,8 @@ class MockBackend {
       user['organization_code'] = code;
       user['membership_status'] = 'active';
     }
+    // La nueva org queda activa para el dueño; arranca sin datos.
+    _syncOrg();
     return MockResponse(201, org);
   }
 
@@ -734,6 +760,8 @@ class MockBackend {
       user['organization_code'] = targetOrg['code'];
       user['membership_status'] = 'pending';
     }
+    // Membresía pendiente → sin org activa hasta que el dueño apruebe.
+    _syncOrg();
     final reqId = _nextRequestId++;
     final req = <String, Object?>{
       'id': reqId,
@@ -778,6 +806,7 @@ class MockBackend {
     if (user != null) {
       user['membership_status'] = 'active';
     }
+    _syncOrg();
     return MockResponse(200, req);
   }
 
@@ -798,6 +827,7 @@ class MockBackend {
     if (user != null) {
       user['membership_status'] = 'rejected';
     }
+    _syncOrg();
     return MockResponse(200, req);
   }
 
@@ -818,6 +848,45 @@ class MockBackend {
     if (value is! String) return null;
     final text = value.trim();
     return text.isEmpty ? null : text;
+  }
+
+  /// Filtra filas por la org actual; vacío si no hay membresía activa.
+  List<Map<String, Object?>> _inCurrentOrg(
+    Iterable<Map<String, Object?>> rows,
+  ) {
+    final orgId = _currentOrgId;
+    if (orgId == null) return <Map<String, Object?>>[];
+    return rows.where((row) => row['organization_id'] == orgId).toList();
+  }
+
+  /// `true` si la fila pertenece a la org actual (detalle ajeno → 404).
+  bool _belongsToCurrentOrg(Map<String, Object?> row) =>
+      _currentOrgId != null && row['organization_id'] == _currentOrgId;
+
+  /// 403 si el usuario no tiene organización activa (BE multi-tenant).
+  MockResponse _membershipError() => const MockResponse(403, <String, Object?>{
+    'code': 'membership_not_active',
+    'message': 'No perteneces a una organización activa.',
+  });
+
+  /// Sincroniza la org activa con la membresía del usuario actual.
+  void _syncOrg() {
+    final user = _userOrgMap[_currentUserId];
+    final active = user?['membership_status'] == 'active';
+    _currentOrgId = active ? (user?['organization_id'] as int?) : null;
+  }
+
+  /// Versión de cola de la org actual (1 si aún no existe).
+  int _queueVersionOf(int? orgId) {
+    if (orgId == null) return 1;
+    return _queueVersion[orgId] ?? 1;
+  }
+
+  /// Incrementa la versión de la org actual (no-op sin org).
+  void _bumpQueueVersion() {
+    final orgId = _currentOrgId;
+    if (orgId == null) return;
+    _queueVersion[orgId] = _queueVersionOf(orgId) + 1;
   }
 
   MockResponse _updateOrganization(Object? body) {
@@ -1031,7 +1100,7 @@ class MockBackend {
   Map<String, Object?> _buildQueue() {
     final unassigned = <Map<String, Object?>>[];
     final byPrinter = <String, List<Map<String, Object?>>>{};
-    for (final item in _queueItems) {
+    for (final item in _inCurrentOrg(_queueItems)) {
       final printerId = item['printer_id'];
       if (printerId == null) {
         unassigned.add(item);
@@ -1048,14 +1117,15 @@ class MockBackend {
     return <String, Object?>{
       'unassigned': unassigned,
       'by_printer': byPrinter,
-      'version': _queueVersion,
+      'version': _queueVersionOf(_currentOrgId),
     };
   }
 
   MockResponse _reorder(Object? body) {
     final map = body is Map ? body : const <String, Object?>{};
     final clientVersion = map['version'];
-    if (clientVersion is int && clientVersion != _queueVersion) {
+    if (clientVersion is int &&
+        clientVersion != _queueVersionOf(_currentOrgId)) {
       return const MockResponse(409, <String, Object?>{
         'code': 'queue_version_conflict',
         'message': 'La cola cambió en otro dispositivo. Vuelve a cargar.',
@@ -1066,25 +1136,27 @@ class MockBackend {
       for (final raw in entries) {
         if (raw is! Map) continue;
         final id = raw['id'];
-        final match = _queueItems.where((i) => i['id'] == id).toList();
+        final match = _queueItems
+            .where((i) => i['id'] == id && _belongsToCurrentOrg(i))
+            .toList();
         if (match.isEmpty) continue;
         match.first['printer_id'] = raw['printer_id'];
         match.first['position'] = raw['position'] ?? 0;
       }
     }
-    _queueVersion++;
+    _bumpQueueVersion();
     return MockResponse(200, _buildQueue());
   }
 
   MockResponse _cameraSnapshot(int printerId, int index) {
-    final match = _printers.where((p) => p['id'] == printerId).toList();
-    if (match.isEmpty || match.first['camera_available'] != true) {
+    final printer = _printerById(printerId);
+    if (printer == null || printer['camera_available'] != true) {
       return const MockResponse(404, <String, Object?>{
         'code': 'camera_unavailable',
         'message': 'La impresora no tiene cámara o aún no hay snapshot.',
       });
     }
-    final cameras = match.first['cameras'] as List<Object?>? ?? const [];
+    final cameras = printer['cameras'] as List<Object?>? ?? const [];
     if (index >= cameras.length) {
       return const MockResponse(404, <String, Object?>{
         'code': 'camera_unavailable',
@@ -1135,6 +1207,8 @@ class MockBackend {
   // --- CRUD Impresoras ----------------------------------------------------
 
   MockResponse _createPrinter(Object? body) {
+    final orgId = _currentOrgId;
+    if (orgId == null) return _membershipError();
     final map = body is Map ? body : const <String, Object?>{};
     final name = (map['name'] as String?)?.trim() ?? '';
     if (name.isEmpty) {
@@ -1147,6 +1221,7 @@ class MockBackend {
     final model = ((map['model'] as String?) ?? '').trim();
     final printer = <String, Object?>{
       'id': id,
+      'organization_id': orgId,
       'name': name,
       'model': model.isEmpty ? null : model,
       'state': 'idle',
@@ -1229,13 +1304,15 @@ class MockBackend {
         }
       }
     }
-    _queueVersion++;
+    _bumpQueueVersion();
     return const MockResponse(204, null);
   }
 
   // --- Clientes -----------------------------------------------------------
 
   MockResponse _createCustomer(Object? body) {
+    final orgId = _currentOrgId;
+    if (orgId == null) return _membershipError();
     final map = body is Map ? body : const <String, Object?>{};
     final name = (map['name'] as String?)?.trim() ?? '';
     if (name.isEmpty) {
@@ -1251,6 +1328,7 @@ class MockBackend {
       (map['phone'] as String?) ?? '',
       (map['email'] as String?) ?? '',
     );
+    cust['organization_id'] = orgId;
     if (map.containsKey('notes')) {
       cust['notes'] = map['notes'];
     }
@@ -1260,7 +1338,7 @@ class MockBackend {
 
   MockResponse _getCustomer(int customerId) {
     final cust = _firstWhereOrNull(_customers, (c) => c['id'] == customerId);
-    if (cust == null) {
+    if (cust == null || !_belongsToCurrentOrg(cust)) {
       return const MockResponse(404, <String, Object?>{
         'code': 'not_found',
         'message': 'Cliente no encontrado.',
@@ -1269,15 +1347,45 @@ class MockBackend {
     return MockResponse(200, cust);
   }
 
+  MockResponse _createProduct(Object? body) {
+    final orgId = _currentOrgId;
+    if (orgId == null) return _membershipError();
+    final map = body is Map ? body : const <String, Object?>{};
+    final name = (map['name'] as String?)?.trim() ?? '';
+    if (name.isEmpty) {
+      return const MockResponse(422, <String, Object?>{
+        'code': 'invalid_name',
+        'message': 'El nombre del producto es obligatorio.',
+      });
+    }
+    final product = <String, Object?>{
+      'id': _nextProductId++,
+      'organization_id': orgId,
+      'name': name,
+      'material': _identityText(map['material']),
+      'color': _identityText(map['color']),
+      'estimated_weight_g': (map['estimated_weight_g'] as num?)?.toDouble(),
+      'estimated_minutes': (map['estimated_minutes'] as num?)?.toInt(),
+      'extra_cost': (map['extra_cost'] as num?)?.toDouble(),
+      'has_gcode': (map['has_gcode'] as bool?) ?? false,
+      'base_price': (map['base_price'] as num?)?.toDouble() ?? 0.0,
+    };
+    _products.add(product);
+    return MockResponse(201, product);
+  }
+
   // --- P-04: sugerencia de asignación -------------------------------------
 
   MockResponse _suggest() {
-    final pending = _queueItems.where((i) => i['printer_id'] == null).toList()
+    final items = _inCurrentOrg(_queueItems);
+    final pending = items.where((i) => i['printer_id'] == null).toList()
       ..sort(_byPromisedDate);
-    final printers = _printers.where((p) => p['state'] != 'offline').toList();
+    final printers = _inCurrentOrg(
+      _printers,
+    ).where((p) => p['state'] != 'offline').toList();
 
     final load = <int, int>{for (final p in printers) p['id']! as int: 0};
-    for (final item in _queueItems) {
+    for (final item in items) {
       final pid = item['printer_id'];
       if (pid is int && load.containsKey(pid)) {
         load[pid] = load[pid]! + ((item['estimated_minutes'] as int?) ?? 0);
@@ -1327,7 +1435,7 @@ class MockBackend {
     }
 
     return MockResponse(200, <String, Object?>{
-      'version': _queueVersion,
+      'version': _queueVersionOf(_currentOrgId),
       'summary': assignments.isEmpty
           ? 'No hay items pendientes por asignar.'
           : '${assignments.length} '
@@ -1359,7 +1467,8 @@ class MockBackend {
   MockResponse _accept(Object? body) {
     final map = body is Map ? body : const <String, Object?>{};
     final clientVersion = map['version'];
-    if (clientVersion is int && clientVersion != _queueVersion) {
+    if (clientVersion is int &&
+        clientVersion != _queueVersionOf(_currentOrgId)) {
       return const MockResponse(409, <String, Object?>{
         'code': 'queue_version_conflict',
         'message': 'La cola cambió en otro dispositivo. Vuelve a cargar.',
@@ -1370,7 +1479,9 @@ class MockBackend {
       for (final raw in entries) {
         if (raw is! Map) continue;
         final id = raw['item_id'];
-        final match = _queueItems.where((i) => i['id'] == id).toList();
+        final match = _queueItems
+            .where((i) => i['id'] == id && _belongsToCurrentOrg(i))
+            .toList();
         if (match.isEmpty) continue;
         final printerId = raw['printer_id'] as int?;
         match.first['printer_id'] = printerId;
@@ -1380,13 +1491,13 @@ class MockBackend {
         }
       }
     }
-    _queueVersion++;
+    _bumpQueueVersion();
     return MockResponse(200, _buildQueue());
   }
 
   int _nextPosition(int? printerId) {
     var max = -1;
-    for (final item in _queueItems) {
+    for (final item in _inCurrentOrg(_queueItems)) {
       if (item['printer_id'] == printerId) {
         final pos = item['position'] as int? ?? 0;
         if (pos > max) max = pos;
@@ -1487,6 +1598,7 @@ class MockBackend {
     required String state,
   }) => <String, Object?>{
     'id': _nextJobId++,
+    'organization_id': item['organization_id'],
     'item_id': item['id'],
     'printer_id': printer['id'],
     'printer_name': printer['name'],
@@ -1523,6 +1635,7 @@ class MockBackend {
 
     final summaries = <Map<String, Object?>>[];
     for (final id in _orders.keys) {
+      if (!_belongsToCurrentOrg(_orders[id]!)) continue;
       final summary = _buildOrderSummary(id);
       if (status != null && summary['status'] != status) continue;
       if (customerId != null && _orders[id]!['customer_id'] != customerId) {
@@ -1552,7 +1665,8 @@ class MockBackend {
   }
 
   MockResponse _getOrder(int orderId) {
-    if (!_orders.containsKey(orderId)) {
+    final order = _orders[orderId];
+    if (order == null || !_belongsToCurrentOrg(order)) {
       return const MockResponse(404, <String, Object?>{
         'code': 'not_found',
         'message': 'Pedido no encontrado.',
@@ -1563,7 +1677,7 @@ class MockBackend {
 
   MockResponse _updateOrderStatus(int orderId, Object? body) {
     final order = _orders[orderId];
-    if (order == null) {
+    if (order == null || !_belongsToCurrentOrg(order)) {
       return const MockResponse(404, <String, Object?>{
         'code': 'not_found',
         'message': 'Pedido no encontrado.',
@@ -1579,6 +1693,8 @@ class MockBackend {
   }
 
   MockResponse _createOrder(Object? body) {
+    final orgId = _currentOrgId;
+    if (orgId == null) return _membershipError();
     final map = body is Map ? body : const <String, Object?>{};
     final rawItems = (map['items'] as List?) ?? const <Object?>[];
     if (rawItems.isEmpty) {
@@ -1589,8 +1705,18 @@ class MockBackend {
     }
 
     final customer = _resolveCustomer(map);
+    if (customer == null) {
+      return const MockResponse(422, <String, Object?>{
+        'code': 'invalid',
+        'message': 'Se requiere un cliente.',
+      });
+    }
     final orderId = _nextOrderId++;
-    final folio = 'NL-$orderId';
+    // Folio secuencial por organización (igual que el backend real).
+    final orgOrderCount = _orders.values
+        .where((o) => o['organization_id'] == orgId)
+        .length;
+    final folio = 'NL-${orgOrderCount + 1}';
     final promised = map['promised_date']?.toString();
     final items = rawItems.whereType<Map<dynamic, dynamic>>().toList();
 
@@ -1605,22 +1731,23 @@ class MockBackend {
       final qty = (raw['quantity'] as int?) ?? 1;
       computedTotal += (product['base_price'] as num).toDouble() * qty;
       final itemId = _nextItemId++;
-      _queueItems.add(
-        _item(
-          id: itemId,
-          orderId: orderId,
-          productId: product['id']! as int,
-          product: product['name']! as String,
-          color: (raw['color'] as String?) ?? product['color'] as String? ?? '',
-          qty: qty,
-          printed: 0,
-          state: 'pending',
-          printerId: null,
-          position: _nextPosition(null),
-          minutes: (product['estimated_minutes'] as int?) ?? 0,
-          promised: promised,
-        ),
+      final newItem = _item(
+        id: itemId,
+        orderId: orderId,
+        productId: product['id']! as int,
+        product: product['name']! as String,
+        color: (raw['color'] as String?) ?? product['color'] as String? ?? '',
+        qty: qty,
+        printed: 0,
+        state: 'pending',
+        printerId: null,
+        position: _nextPosition(null),
+        minutes: (product['estimated_minutes'] as int?) ?? 0,
+        promised: promised,
+        folio: folio,
       );
+      newItem['organization_id'] = orgId;
+      _queueItems.add(newItem);
     }
     if (discarded.isNotEmpty) {
       return MockResponse(422, <String, Object?>{
@@ -1629,7 +1756,7 @@ class MockBackend {
       });
     }
 
-    _orders[orderId] = _order(
+    final order = _order(
       folio: folio,
       customerId: customer['id']! as int,
       promised: promised,
@@ -1639,18 +1766,23 @@ class MockBackend {
         _h('confirmed', null, _now(), 'Operador Demo'),
       ],
     );
+    order['organization_id'] = orgId;
+    _orders[orderId] = order;
     return MockResponse(201, _buildOrderDetail(orderId));
   }
 
-  Map<String, Object?> _resolveCustomer(Map<dynamic, dynamic> map) {
+  Map<String, Object?>? _resolveCustomer(Map<dynamic, dynamic> map) {
+    final orgCustomers = _inCurrentOrg(_customers);
     final customerId = map['customer_id'] as int?;
     if (customerId != null) {
-      final existing = _customers.where((c) => c['id'] == customerId).toList();
+      final existing = orgCustomers
+          .where((c) => c['id'] == customerId)
+          .toList();
       if (existing.isNotEmpty) return existing.first;
     }
     final name = map['customer_name'] as String?;
     if (name != null && name.trim().isNotEmpty) {
-      final existing = _customers
+      final existing = orgCustomers
           .where(
             (c) => c['name'] == name && map['customer_phone'] == c['phone'],
           )
@@ -1662,10 +1794,11 @@ class MockBackend {
         (map['customer_phone'] as String?) ?? '',
         '',
       );
+      created['organization_id'] = _currentOrgId;
       _customers.add(created);
       return created;
     }
-    return _customers.first;
+    return orgCustomers.isNotEmpty ? orgCustomers.first : null;
   }
 
   Map<String, Object?> _buildOrderSummary(int orderId) {
@@ -1770,17 +1903,29 @@ class MockBackend {
 
   // --- helpers -------------------------------------------------------------
 
-  Map<String, Object?>? _printerById(int? id) =>
-      _firstWhereOrNull(_printers, (p) => p['id'] == id);
+  Map<String, Object?>? _printerById(int? id) {
+    final printer = _firstWhereOrNull(_printers, (p) => p['id'] == id);
+    if (printer == null || !_belongsToCurrentOrg(printer)) return null;
+    return printer;
+  }
 
-  Map<String, Object?>? _itemById(int? id) =>
-      _firstWhereOrNull(_queueItems, (i) => i['id'] == id);
+  Map<String, Object?>? _itemById(int? id) {
+    final item = _firstWhereOrNull(_queueItems, (i) => i['id'] == id);
+    if (item == null || !_belongsToCurrentOrg(item)) return null;
+    return item;
+  }
 
-  Map<String, Object?>? _jobById(int? id) =>
-      _firstWhereOrNull(_jobs, (j) => j['id'] == id);
+  Map<String, Object?>? _jobById(int? id) {
+    final job = _firstWhereOrNull(_jobs, (j) => j['id'] == id);
+    if (job == null || !_belongsToCurrentOrg(job)) return null;
+    return job;
+  }
 
-  Map<String, Object?>? _productById(int? id) =>
-      _firstWhereOrNull(_products, (p) => p['id'] == id);
+  Map<String, Object?>? _productById(int? id) {
+    final product = _firstWhereOrNull(_products, (p) => p['id'] == id);
+    if (product == null || !_belongsToCurrentOrg(product)) return null;
+    return product;
+  }
 
   static Map<String, Object?>? _firstWhereOrNull(
     List<Map<String, Object?>> list,

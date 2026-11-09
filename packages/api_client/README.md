@@ -100,6 +100,7 @@ Class | Method | HTTP request | Description
 [*PrintersApi*](doc/PrintersApi.md) | [**testPrinterConnection**](doc/PrintersApi.md#testprinterconnection) | **POST** /api/printers/test | Prueba la conexión a OctoPrint con URL y API key (BE-01)
 [*PrintersApi*](doc/PrintersApi.md) | [**testPrinterConnectionById**](doc/PrintersApi.md#testprinterconnectionbyid) | **POST** /api/printers/{printerId}/test | Prueba la conexión guardada de una impresora (BE-01)
 [*PrintersApi*](doc/PrintersApi.md) | [**updatePrinter**](doc/PrintersApi.md#updateprinter) | **PATCH** /api/printers/{printerId} | Actualiza configuración o estado de la impresora
+[*ProductsApi*](doc/ProductsApi.md) | [**createProduct**](doc/ProductsApi.md#createproduct) | **POST** /api/products | Crear producto en el catálogo de la organización
 [*ProductsApi*](doc/ProductsApi.md) | [**listProducts**](doc/ProductsApi.md#listproducts) | **GET** /api/products | Catálogo de productos (para nuevo pedido)
 [*PublicApi*](doc/PublicApi.md) | [**getBranding**](doc/PublicApi.md#getbranding) | **GET** /api/public/branding | Marca y configuración visible del negocio
 [*PublicApi*](doc/PublicApi.md) | [**getPublicTrack**](doc/PublicApi.md#getpublictrack) | **GET** /api/public/track/{token} | Seguimiento público de pedido por token
@@ -145,6 +146,7 @@ Class | Method | HTTP request | Description
  - [PrinterState](doc/PrinterState.md)
  - [PrinterUpdateRequest](doc/PrinterUpdateRequest.md)
  - [Product](doc/Product.md)
+ - [ProductCreateRequest](doc/ProductCreateRequest.md)
  - [PublicLookupRequest](doc/PublicLookupRequest.md)
  - [PublicLookupResponse](doc/PublicLookupResponse.md)
  - [Queue](doc/Queue.md)

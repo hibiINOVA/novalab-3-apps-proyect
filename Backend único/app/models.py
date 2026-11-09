@@ -1,8 +1,10 @@
 """Modelos SQLAlchemy. Mapean 1:1 a los `components/schemas` del contrato.
 
-Organizaciones (contrato `/api/organizations*`): cada usuario puede
-pertenecer a una organización; los recursos operativos siguen siendo del
-negocio instalación (no hay `org_id` en printers/orders/queue).
+Multi-tenant por organización (contrato `/api/organizations*`): cada
+recurso operativo (business, spools, printers, customers, products,
+orders, order_items, status_history, print_jobs) lleva `organization_id`
+— cada organización ve solo sus propios datos. La org se resuelve en el
+servidor desde el JWT del usuario (1 usuario = 1 org).
 """
 
 from datetime import UTC, date, datetime
@@ -16,6 +18,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -98,11 +101,14 @@ class OrganizationMember(Base):
 
 
 class Business(Base):
-    """Configuración única del negocio (branding, tarifas, meta)."""
+    """Configuración del negocio por organización (branding, tarifas, meta)."""
 
     __tablename__ = "business"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), unique=True, index=True
+    )
     business_name: Mapped[str] = mapped_column(String(120), default="NOVALAB")
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     primary_color: Mapped[str] = mapped_column(String(9), default="#0B132B")
@@ -126,6 +132,9 @@ class Spool(Base):
     __tablename__ = "spools"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
     material: Mapped[str] = mapped_column(String(60))
     color: Mapped[str] = mapped_column(String(60))
     grams_total: Mapped[float] = mapped_column(Float, default=1000.0)
@@ -139,6 +148,9 @@ class Printer(Base):
     __tablename__ = "printers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
     name: Mapped[str] = mapped_column(String(120))
     model: Mapped[str | None] = mapped_column(String(80), nullable=True)
     octoprint_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
@@ -172,6 +184,9 @@ class Customer(Base):
     __tablename__ = "customers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
     name: Mapped[str] = mapped_column(String(160))
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -183,6 +198,9 @@ class Product(Base):
     __tablename__ = "products"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
     name: Mapped[str] = mapped_column(String(160))
     material: Mapped[str | None] = mapped_column(String(60), nullable=True)
     color: Mapped[str | None] = mapped_column(String(60), nullable=True)
@@ -198,9 +216,14 @@ class Order(Base):
     delivered/cancelled); el resto se deriva de los items."""
 
     __tablename__ = "orders"
+    # Unicidad por organización: el folio NL-1001 puede repetirse entre orgs.
+    __table_args__ = (UniqueConstraint("organization_id", "folio", name="uq_orders_org_folio"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    folio: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    folio: Mapped[str] = mapped_column(String(40), index=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
     customer_id: Mapped[int | None] = mapped_column(
         ForeignKey("customers.id"), nullable=True
     )
@@ -230,6 +253,9 @@ class OrderItem(Base):
     __tablename__ = "order_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
     color: Mapped[str | None] = mapped_column(String(60), nullable=True)
@@ -253,6 +279,9 @@ class OrderStatusHistory(Base):
     __tablename__ = "status_history"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
     status: Mapped[str] = mapped_column(String(30))
     previous_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
@@ -266,6 +295,9 @@ class PrintJob(Base):
     __tablename__ = "print_jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
     item_id: Mapped[int] = mapped_column(ForeignKey("order_items.id"), index=True)
     printer_id: Mapped[int] = mapped_column(ForeignKey("printers.id"))
     state: Mapped[str] = mapped_column(String(20), default="queued")

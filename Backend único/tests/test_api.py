@@ -769,3 +769,146 @@ def test_printer_create_with_model(client):
     # el seed trae modelos conocidos
     r = client.get("/api/printers", headers=h)
     assert any(p["model"] == "Prusa MK4" for p in r.json())
+
+
+# --- multi-tenant: aislamiento por organización -----------------------------
+def _make_org(client, name, email):
+    """Registra un dueño nuevo y le crea su propia organización."""
+    _, h = _register(client, name, email, "owner")
+    r = client.post("/api/organizations", headers=h, json={"name": name})
+    assert r.status_code == 201, r.text
+    return h, r.json()
+
+
+def test_multitenant_new_org_starts_empty(client):
+    """Una org nueva no ve impresoras, cola ni pedidos de otras orgs."""
+    h_b, _ = _make_org(client, "Taller Vacío", "vacio@ejemplo.mx")
+
+    r = client.get("/api/printers", headers=h_b)
+    assert r.status_code == 200
+    assert r.json() == []
+
+    r = client.get("/api/queue", headers=h_b)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["unassigned"] == []
+    assert body["by_printer"] == {}
+
+    r = client.get("/api/orders", headers=h_b)
+    assert r.status_code == 200
+    assert r.json() == []
+
+    r = client.get("/api/customers", headers=h_b)
+    assert r.json() == []
+    r = client.get("/api/products", headers=h_b)
+    assert r.json() == []
+
+
+def test_multitenant_printer_404_across_orgs(client):
+    """La Ender demo (org seed) no es visible ni modificable desde otra org."""
+    h_a = _auth(client)  # org seed (NOVALAB)
+    h_b, _ = _make_org(client, "Taller Aíslado", "aislado@ejemplo.mx")
+
+    r = client.get("/api/printers", headers=h_a)
+    seed_ids = [p["id"] for p in r.json()]
+    assert seed_ids, "la org seed debe tener impresoras"
+    target = seed_ids[0]
+
+    # Otra org: lista sin esas impresoras y detalle → 404
+    r = client.get("/api/printers", headers=h_b)
+    assert r.json() == []
+    r = client.get(f"/api/printers/{target}", headers=h_b)
+    assert r.status_code == 404
+    r = client.patch(f"/api/printers/{target}", headers=h_b,
+                     json={"name": "hackeada"})
+    assert r.status_code == 404
+    r = client.delete(f"/api/printers/{target}", headers=h_b)
+    assert r.status_code == 404
+
+    # La org seed sigue viéndola con su nombre original
+    r = client.get(f"/api/printers/{target}", headers=h_a)
+    assert r.status_code == 200
+
+
+def test_multitenant_order_404_and_isolated_folio(client):
+    """Pedidos aislados entre orgs."""
+    h_a = _auth(client)
+    h_b, _ = _make_org(client, "Taller Este", "este@ejemplo.mx")
+
+    r = client.get("/api/orders", headers=h_a)
+    seed_orders = r.json()
+    assert seed_orders
+    seed_order_id = seed_orders[0]["id"]
+
+    # Detalle del pedido seed desde la org B → 404
+    r = client.get(f"/api/orders/{seed_order_id}", headers=h_b)
+    assert r.status_code == 404
+    r = client.patch(f"/api/orders/{seed_order_id}/status", headers=h_b,
+                     json={"status": "cancelled"})
+    assert r.status_code == 404
+
+    # La cola de B no incluye items del pedido seed
+    r = client.get("/api/queue", headers=h_b)
+    assert r.json()["unassigned"] == []
+
+
+def test_multitenant_folio_unique_per_org(client):
+    """Dos orgs pueden tener el mismo folio (unique compuesto por org)."""
+    h_a = _auth(client)
+    h_b, _ = _make_org(client, "Taller Oeste", "oeste@ejemplo.mx")
+
+    def _mk_product(h, name):
+        r = client.post("/api/products", headers=h, json={
+            "name": name, "base_price": 50.0, "estimated_minutes": 10,
+        })
+        assert r.status_code == 201, r.text
+        return r.json()
+
+    def _mk_order(h, product_id, customer):
+        r = client.post("/api/orders", headers=h, json={
+            "customer_name": customer,
+            "items": [{"product_id": product_id, "quantity": 1}],
+        })
+        assert r.status_code == 201, r.text
+        return r.json()
+
+    product_a = _mk_product(h_a, "Producto Colisión A")
+    product_b = _mk_product(h_b, "Llavero B")
+
+    # A crea un pedido: su folio es NL-{n+1} donde n = pedidos actuales de A.
+    n_a = len(client.get("/api/orders", headers=h_a).json())
+    order_a = _mk_order(h_a, product_a["id"], "Cliente Colisión A")
+    assert order_a["folio"] == f"NL-{n_a + 1}"
+
+    # B crea pedidos hasta alcanzar el mismo número de folio.
+    order_b = None
+    for i in range(n_a + 1):
+        order_b = _mk_order(h_b, product_b["id"], f"Cliente B{i}")
+    assert order_b["folio"] == order_a["folio"]  # mismo folio, org distinta
+    assert order_b["id"] != order_a["id"]
+
+    # Cada org ve solo su pedido con ese folio.
+    folio = order_a["folio"]
+    r = client.get(f"/api/orders?q={folio}", headers=h_a)
+    assert [o["id"] for o in r.json()] == [order_a["id"]]
+    r = client.get(f"/api/orders?q={folio}", headers=h_b)
+    assert [o["id"] for o in r.json()] == [order_b["id"]]
+
+
+def test_multitenant_queue_version_is_per_org(client):
+    """Reorder en una org no cambia la versión de la otra."""
+    h_a = _auth(client)
+    h_b, _ = _make_org(client, "Taller Sur2", "sur2@ejemplo.mx")
+
+    r = client.get("/api/queue", headers=h_a)
+    ver_a = r.json()["version"]
+    r = client.get("/api/queue", headers=h_b)
+    ver_b = r.json()["version"]
+    # A tiene datos sembrados (su versión puede haber crecido con tests);
+    # B arranca en 1 y el reorder de A no debe mover la de B.
+    r = client.patch("/api/queue/reorder", headers=h_a,
+                     json={"version": ver_a, "items": []})
+    assert r.status_code == 200
+
+    r = client.get("/api/queue", headers=h_b)
+    assert r.json()["version"] == ver_b

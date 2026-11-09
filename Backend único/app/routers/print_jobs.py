@@ -3,19 +3,19 @@
 Cuando la impresora tiene OctoPrint configurado, la subida del G-code lo
 envía e inicia físicamente (BE-05/BE-06). El inicio solo ocurre por petición
 explícita del operador (la confirmación la pide el frontend, P-05).
-"""
+
+Multi-tenant: job/item/printer deben pertenecer a la org activa."""
 
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_current_user
+from app.deps import get_current_org
 from app.events import hub
-from app.models import OrderItem, PrintJob, Printer
+from app.models import OrderItem, Organization, PrintJob, Printer
 from app.schemas import (
     PrintJob as PrintJobSchema,
     PrintJobFailRequest,
@@ -52,14 +52,25 @@ def _job_schema(job: PrintJob) -> PrintJobSchema:
     )
 
 
+def _get_owned_job(db: Session, org: Organization, job_id: int) -> PrintJob:
+    job = db.get(PrintJob, job_id)
+    if job is None or job.organization_id != org.id:
+        raise HTTPException(404, {"code": "not_found",
+                                  "message": "Job no encontrado."})
+    return job
+
+
 @router.post("", operation_id="startPrintJob", response_model=PrintJobSchema,
              status_code=201)
-async def start(body: PrintJobStartRequest, db: Session = Depends(get_db),
-                _user=Depends(get_current_user)):
+async def start(body: PrintJobStartRequest,
+                org: Organization = Depends(get_current_org),
+                db: Session = Depends(get_db)):
     """BE-05: solo con confirmación explícita (el frontend ya la pidió)."""
     item = db.get(OrderItem, body.item_id)
     printer = db.get(Printer, body.printer_id)
-    if item is None or printer is None:
+    if (item is None or printer is None
+            or item.organization_id != org.id
+            or printer.organization_id != org.id):
         raise HTTPException(404, {"code": "not_found",
                                   "message": "Item o impresora no encontrados."})
     if printer.state not in ("idle", "paused"):
@@ -75,6 +86,7 @@ async def start(body: PrintJobStartRequest, db: Session = Depends(get_db),
     printer.current_file = item.product.name
     printer.progress = 0.0
     job = PrintJob(
+        organization_id=org.id,
         item_id=item.id,
         printer_id=printer.id,
         state="printing",
@@ -82,26 +94,25 @@ async def start(body: PrintJobStartRequest, db: Session = Depends(get_db),
     )
     db.add(job)
     db.flush()
-    version = bump_version(db)
+    version = bump_version(db, org.id)
     await hub.broadcast("print_job.started", "print_job", job.id,
-                        {"item_id": item.id, "printer_id": printer.id})
+                        {"item_id": item.id, "printer_id": printer.id},
+                        org_id=org.id)
     await hub.broadcast("printer.state", "printer", printer.id,
-                        {"state": printer.state})
-    await hub.broadcast("queue.updated", "queue", payload={"version": version})
+                        {"state": printer.state}, org_id=org.id)
+    await hub.broadcast("queue.updated", "queue", payload={"version": version},
+                        org_id=org.id)
     return _job_schema(job)
 
 
 @router.post("/{job_id}/gcode", operation_id="uploadPrintJobGcode",
              response_model=PrintJobSchema)
 async def upload_gcode(job_id: int, file: UploadFile = File(...),
-                       db: Session = Depends(get_db),
-                       _user=Depends(get_current_user)):
+                       org: Organization = Depends(get_current_org),
+                       db: Session = Depends(get_db)):
     """BE-05: asocia un .gcode al job; si la impresora tiene OctoPrint, lo
     envía e inicia (solo tras la confirmación explícita del start)."""
-    job = db.get(PrintJob, job_id)
-    if job is None:
-        raise HTTPException(404, {"code": "not_found",
-                                  "message": "Job no encontrado."})
+    job = _get_owned_job(db, org, job_id)
     filename, data = await read_upload(file, MAX_GCODE_BYTES,
                                        GCODE_EXTENSIONS, "gcode")
     path = save_file(f"gcode/{job.id}", filename, data)
@@ -121,9 +132,10 @@ async def upload_gcode(job_id: int, file: UploadFile = File(...),
         except OctoPrintError as exc:
             fail_job(db, job, f"OctoPrint rechazó el archivo: {exc}")
             await hub.broadcast("print_job.failed", "print_job", job.id,
-                                {"item_id": job.item_id, "reason": str(exc)})
+                                {"item_id": job.item_id, "reason": str(exc)},
+                                org_id=org.id)
             await hub.broadcast("printer.state", "printer", printer.id,
-                                {"state": printer.state})
+                                {"state": printer.state}, org_id=org.id)
             raise HTTPException(
                 502,
                 {"code": "octoprint_error",
@@ -133,10 +145,11 @@ async def upload_gcode(job_id: int, file: UploadFile = File(...),
 
 
 @router.get("/{job_id}/gcode", operation_id="downloadPrintJobGcode")
-def download_gcode(job_id: int, db: Session = Depends(get_db),
-                   _user=Depends(get_current_user)):
-    job = db.get(PrintJob, job_id)
-    if job is None or not job.current_file:
+def download_gcode(job_id: int,
+                   org: Organization = Depends(get_current_org),
+                   db: Session = Depends(get_db)):
+    job = _get_owned_job(db, org, job_id)
+    if not job.current_file:
         raise HTTPException(404, {"code": "not_found",
                                   "message": "Job sin archivo G-code."})
     path = storage_dir() / "gcode" / str(job.id) / job.current_file
@@ -149,56 +162,54 @@ def download_gcode(job_id: int, db: Session = Depends(get_db),
 
 @router.post("/{job_id}/complete", operation_id="completePrintJob",
              response_model=PrintJobSchema)
-async def complete(job_id: int, db: Session = Depends(get_db),
-                   _user=Depends(get_current_user)):
-    job = db.get(PrintJob, job_id)
-    if job is None:
-        raise HTTPException(404, {"code": "not_found",
-                                  "message": "Job no encontrado."})
+async def complete(job_id: int,
+                   org: Organization = Depends(get_current_org),
+                   db: Session = Depends(get_db)):
+    job = _get_owned_job(db, org, job_id)
     version = complete_job(db, job)
     await hub.broadcast("print_job.completed", "print_job", job.id,
-                        {"item_id": job.item_id})
+                        {"item_id": job.item_id}, org_id=org.id)
     await hub.broadcast("printer.state", "printer", job.printer_id,
-                        {"state": job.printer.state})
-    await hub.broadcast("queue.updated", "queue", payload={"version": version})
+                        {"state": job.printer.state}, org_id=org.id)
+    await hub.broadcast("queue.updated", "queue", payload={"version": version},
+                        org_id=org.id)
     return _job_schema(job)
 
 
 @router.post("/{job_id}/fail", operation_id="failPrintJob",
              response_model=PrintJobSchema)
 async def fail(job_id: int, body: PrintJobFailRequest,
-               db: Session = Depends(get_db),
-               _user=Depends(get_current_user)):
-    job = db.get(PrintJob, job_id)
-    if job is None:
-        raise HTTPException(404, {"code": "not_found",
-                                  "message": "Job no encontrado."})
+               org: Organization = Depends(get_current_org),
+               db: Session = Depends(get_db)):
+    job = _get_owned_job(db, org, job_id)
     version = fail_job(db, job, body.reason)
     await hub.broadcast("print_job.failed", "print_job", job.id,
-                        {"item_id": job.item_id, "reason": body.reason})
+                        {"item_id": job.item_id, "reason": body.reason},
+                        org_id=org.id)
     await hub.broadcast("printer.state", "printer", job.printer_id,
-                        {"state": job.printer.state})
-    await hub.broadcast("queue.updated", "queue", payload={"version": version})
+                        {"state": job.printer.state}, org_id=org.id)
+    await hub.broadcast("queue.updated", "queue", payload={"version": version},
+                        org_id=org.id)
     return _job_schema(job)
 
 
 @router.post("/{job_id}/reprint", operation_id="reprintJob",
              response_model=PrintJobSchema, status_code=201)
-async def reprint(job_id: int, db: Session = Depends(get_db),
-                  _user=Depends(get_current_user)):
+async def reprint(job_id: int,
+                  org: Organization = Depends(get_current_org),
+                  db: Session = Depends(get_db)):
     """P-10: reimpresión crea un job nuevo en `queued` (no lo auto-inicia)."""
-    old = db.get(PrintJob, job_id)
-    if old is None:
-        raise HTTPException(404, {"code": "not_found",
-                                  "message": "Job no encontrado."})
+    old = _get_owned_job(db, org, job_id)
     item = old.item
     item.state = "queued"
     item.printer_id = old.printer_id
-    job = PrintJob(item_id=item.id, printer_id=old.printer_id, state="queued")
+    job = PrintJob(organization_id=org.id, item_id=item.id,
+                   printer_id=old.printer_id, state="queued")
     db.add(job)
     db.flush()
-    version = bump_version(db)
+    version = bump_version(db, org.id)
     await hub.broadcast("print_job.queued", "print_job", job.id,
-                        {"item_id": item.id})
-    await hub.broadcast("queue.updated", "queue", payload={"version": version})
+                        {"item_id": item.id}, org_id=org.id)
+    await hub.broadcast("queue.updated", "queue", payload={"version": version},
+                        org_id=org.id)
     return _job_schema(job)

@@ -73,7 +73,8 @@ async def _poll_printer(db, printer: Printer) -> None:
             printer.state = "offline"
             db.flush()
             await hub.broadcast("printer.state", "printer", printer.id,
-                                {"state": "offline"})
+                                {"state": "offline"},
+                                org_id=printer.organization_id)
         return
 
     _failures[printer.id] = 0
@@ -91,9 +92,11 @@ async def _poll_printer(db, printer: Printer) -> None:
             and new_state == "idle"):
         complete_job(db, active_job)
         await hub.broadcast("print_job.completed", "print_job", active_job.id,
-                            {"item_id": active_job.item_id})
+                            {"item_id": active_job.item_id},
+                            org_id=printer.organization_id)
         await hub.broadcast("printer.state", "printer", printer.id,
-                            {"state": printer.state})
+                            {"state": printer.state},
+                            org_id=printer.organization_id)
         return
 
     changed = printer.state != new_state
@@ -109,7 +112,8 @@ async def _poll_printer(db, printer: Printer) -> None:
     db.flush()
     if changed:
         await hub.broadcast("printer.state", "printer", printer.id,
-                            {"state": printer.state})
+                            {"state": printer.state},
+                            org_id=printer.organization_id)
 
     # BE-07: snapshot solo mientras haya un job activo.
     if printer.state == "printing" and camera_urls(printer):

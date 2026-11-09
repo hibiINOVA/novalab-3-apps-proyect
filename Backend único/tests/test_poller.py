@@ -119,7 +119,8 @@ def test_poll_auto_completes_finished_job(db, monkeypatch):
                      .limit(1))
     item.state = "printing"
     item.printer_id = p.id
-    job = PrintJob(item_id=item.id, printer_id=p.id, state="printing")
+    job = PrintJob(organization_id=p.organization_id, item_id=item.id,
+                   printer_id=p.id, state="printing")
     db.add(job)
     db.commit()
     # OctoPrint terminó: Operational sin job activo

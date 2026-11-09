@@ -45,7 +45,7 @@ Run backend commands from `Backend único/` (workdir):
 ```bash
 source .venv/bin/activate       # venv (already created)
 uvicorn app.main:app --port 8081   # dev server (auto-creates tables + seed)
-python -m pytest tests/ -q      # 38 tests
+python -m pytest tests/ -q      # 60 tests
 alembic upgrade head            # apply migrations (fresh DBs only)
 ```
 
@@ -62,15 +62,15 @@ Demo creds (mock + backend seed, password `novalab`): `dueno@novalab.mx` (owner)
 - **Two-port topology** (planned): public serves only `Seguimiento del cliente/` + `/api/public/*`; private (LAN/VPN/Cloudflare Access) serves `Producción/` (`/admin`), `Finanzas/` (`/finanzas`), full `/api` + WebSocket.
 - Public API never exposes costs, profits, other clients, or internal IPs (BE-21, BE-22). Client is anonymous, only sees own `tracking_token`.
 - Never auto-start prints: sending G-code requires explicit operator confirmation (BE-05, P-05).
-- Single-tenant operativo: printers/orders/queue/costos no llevan `org_id` (un negocio por instalación). Las **organizaciones** (`/api/organizations*`) solo gestionan membresías owner/operador; no aíslan datos del negocio.
+- **Multi-tenant por organización**: `printers`/`orders`/`queue`/`customers`/`products`/`jobs`/`costos`/`settings`/`business`/`spools`/`status_history` llevan `organization_id` y **todo se filtra por la org activa del usuario JWT** (`get_current_org`, 403 `membership_not_active` si no tiene membresía `active`). Folio único por org (`NL-{conteo por org + 1}`), `queue_version:{org_id}` y rooms de WebSocket por org. Org nueva arranca **vacía** (backfill 0005 asigna lo existente a la org más antigua). Las **organizaciones** (`/api/organizations*`) gestionan el aislamiento de datos más las membresías owner/operador.
 - Camera served via backend snapshot only (no raw stream/IP exposure) (BE-08).
 - Defaults: `es-MX`, texts externalized, currency/timezone configurable (doc §3.12, §7). Branding from `GET /api/public/branding`.
 
 ## Testing notes
 
-- `flutter test` in `Producción/` covers auth/session, live dashboard (controlled WS), queue drag/reorder, suggestion dialog, organization flow, es-MX formatting, responsive nav.
+- `flutter test` in `Producción/` covers auth/session, live dashboard (controlled WS), queue drag/reorder, suggestion dialog, organization flow, es-MX formatting, responsive nav, and **mock multi-tenant** (org nueva vacía, 404 cross-org, folio por org, 403 sin membresía).
 - Mock latency disabled in tests via `mockLatencyProvider`.
-- `python -m pytest tests/` in `Backend único/` covers auth, queue version 409, jobs lifecycle, orders/status, public track/lookup, finance formulas, WS hello, organizations (create/join/approve/reject/update/members/logo), printer CRUD, customers, gcode upload.
+- `python -m pytest tests/` in `Backend único/` covers auth, queue version 409, jobs lifecycle, orders/status, public track/lookup, finance formulas, WS hello, organizations (create/join/approve/reject/update/members/logo), printer CRUD, customers, gcode upload, and **multi-tenant isolation** (org nueva vacía, 404 cross-org, folio/queue_version por org).
 
 ## Conventions
 

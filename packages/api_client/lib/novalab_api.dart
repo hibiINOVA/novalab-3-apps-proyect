@@ -52,6 +52,7 @@ export 'package:novalab_api/src/model/printer_create_request.dart';
 export 'package:novalab_api/src/model/printer_state.dart';
 export 'package:novalab_api/src/model/printer_update_request.dart';
 export 'package:novalab_api/src/model/product.dart';
+export 'package:novalab_api/src/model/product_create_request.dart';
 export 'package:novalab_api/src/model/public_lookup_request.dart';
 export 'package:novalab_api/src/model/public_lookup_response.dart';
 export 'package:novalab_api/src/model/queue.dart';
