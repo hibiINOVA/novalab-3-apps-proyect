@@ -1,0 +1,9 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/p/[token]": [
+		"src/routes/+layout.ts"
+	]
+}

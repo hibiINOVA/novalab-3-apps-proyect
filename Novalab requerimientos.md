@@ -1,7 +1,7 @@
 # NOVALAB — Requerimientos del ecosistema de 3 aplicaciones
 
 **Versión:** 0.1 (borrador de arranque) · **Fecha:** octubre 2026
-**Modelo de despliegue:** autoalojado en una instalación (Raspberry Pi o mini PC) con **multi-tenant por organización**: cada organización aísla sus datos (ver §3.3)
+**Modelo de despliegue:** autoalojado, un negocio por instalación (Raspberry Pi o mini PC)
 
 ---
 
@@ -70,23 +70,19 @@ NOVALAB es un sistema para negocios de impresión 3D que quieren controlar su pr
 
 `auth` · `orders` · `products` · `printers` · `queue` · `spools` · `shipping` · `finance` · `public` · `settings` · `realtime` · `backups`
 
-### 3.3 Modelo de datos (multi-tenant por organización)
-
-Cada **organización** es un espacio aislado: sus impresoras, pedidos, cola, clientes, productos y costos no se mezclan con los de otras. Las tablas operativas (`business`, `spools`, `printers`, `customers`, `products`, `orders`, `order_items`, `order_status_history`, `print_jobs`) llevan `organization_id`; el folio es único **por organización** (`NL-1`, `NL-2`… cuenta por org) y la versión de cola también es por org. Las organizaciones solo gestionan membresías `owner`/`operador`; un usuario ve los datos de la organización donde su membresía esté activa.
+### 3.3 Modelo de datos (un negocio por instalación, sin `org_id`)
 
 | Tabla | Campos principales |
 |-------|--------------------|
-| `settings` (1 fila por org) | nombre del negocio, logo, colores, moneda, zona horaria, tarifa de luz (kWh), URL base de rastreo Estafeta, mostrar pie "Seguimiento por NOVALAB" |
+| `settings` (1 fila) | nombre del negocio, logo, colores, moneda, zona horaria, tarifa de luz (kWh), URL base de rastreo Estafeta, mostrar pie "Seguimiento por NOVALAB" |
 | `users` | nombre, email, hash, rol (`owner` / `operator`), activo |
-| `organizations` | nombre, código de invitación, branding |
-| `organization_members` | organización, usuario, estado (`pending` / `active` / `rejected`) |
-| `customers` | organización, nombre, teléfono, email, notas |
-| `products` | organización, nombre, material, color, peso estimado (g), tiempo estimado (min), costo extra, archivo gcode opcional, precio base |
-| `orders` | organización, folio, cliente, estado, fecha de creación, **fecha prometida**, total, `tracking_token`, notas |
+| `customers` | nombre, teléfono, email, notas |
+| `products` | nombre, material, color, peso estimado (g), tiempo estimado (min), costo extra, archivo gcode opcional, precio base |
+| `orders` | folio, cliente, estado, fecha de creación, **fecha prometida**, total, `tracking_token`, notas |
 | `order_items` | pedido, producto, color, cantidad, **cantidad_impresa**, estado |
 | `print_jobs` | item, impresora, estado, posición en cola, inicio, fin, gramos reales, minutos reales, motivo de falla |
-| `printers` | organización, nombre, URL OctoPrint, API key (cifrada), URL snapshot, tamaño de cama, estado, spool cargado |
-| `spools` | organización, material, color, diámetro, gramos iniciales, gramos restantes, **costo por kg** |
+| `printers` | nombre, URL OctoPrint, API key (cifrada), URL snapshot, tamaño de cama, estado, spool cargado |
+| `spools` | material, color, diámetro, gramos iniciales, gramos restantes, **costo por kg** |
 | `shipments` | pedido, paquetería, número de guía, fecha de envío, fecha de entrega |
 | `expenses` | fecha, categoría (luz, empaque, envío, comisiones, mantenimiento, otro), monto, pedido opcional |
 | `goals` | mes, meta de ganancia |
