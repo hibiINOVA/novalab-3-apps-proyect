@@ -75,63 +75,7 @@ file /tmp/c1.jpg   # JPEG image data
 
 ## 4. Backend NOVALAB en la Pi
 
-```bash
-sudo mkdir -p /opt/novalab && sudo chown $USER /opt/novalab
-git clone <REPO> /opt/novalab/repo
-cd /opt/novalab/repo/"Backend único"
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Variables de entorno (`/opt/novalab/backend.env`, permisos 600):
-
-```ini
-NOVALAB_SECRET_KEY=<cadena larga y aleatoria; genera con: python -c "import secrets;print(secrets.token_urlsafe(48))">
-NOVALAB_JWT_SECRET=<otra cadena aleatoria distinta>
-NOVALAB_DB_URL=sqlite:////opt/novalab/data/novalab.db
-NOVALAB_SEED_DEMO=true
-NOVALAB_POLLER_ENABLED=true
-```
-
-> `NOVALAB_SECRET_KEY` cifra las API keys de impresora en BD (BE-20). Si la pierdes, las impresoras quedan sin API key y hay que volver a guardarlas.
-
-Aplica migraciones y prueba:
-
-```bash
-cd /opt/novalab/repo/"Backend único"
-source .venv/bin/activate
-alembic upgrade head
-uvicorn app.main:app --host 127.0.0.1 --port 8081
-# En otra terminal:
-curl -s http://127.0.0.1:8081/api/health   # 200
-```
-
-### Servicio systemd
-
-`/etc/systemd/system/novalab-backend.service`:
-
-```ini
-[Unit]
-Description=NOVALAB Backend
-After=network.target
-
-[Service]
-User=pi
-WorkingDirectory=/opt/novalab/repo/Backend único
-EnvironmentFile=/opt/novalab/backend.env
-ExecStart=/opt/novalab/repo/Backend único/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8081
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now novalab-backend
-sudo systemctl status novalab-backend
-```
+> **Este procedimiento vive ahora en [`docs/deploy-raspberry-pi.md`](deploy-raspberry-pi.md)** (guía completa desde cero: backend en `:8090`, nginx `:8091`, túnel Cloudflared, auto-deploy cada 2 min y layout `/opt/novalab/{app-repo,backend,data}`). Sigue esa guía; esta sección solo conserva el contexto del poller.
 
 El poller (BE-02/03/04/26) arranca con el backend y consulta OctoPrint en `http://127.0.0.1:5000`; descarga snapshots a `/opt/novalab/data/snapshots/` y los sirve vía la API.
 

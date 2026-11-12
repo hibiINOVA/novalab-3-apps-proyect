@@ -1,0 +1,8 @@
+[Unit]
+Description=NOVALAB auto-deploy desde GitHub
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=hibi
+ExecStart=/opt/novalab/auto-deploy.sh

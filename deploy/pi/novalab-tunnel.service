@@ -1,0 +1,12 @@
+[Unit]
+Description=NOVALAB Cloudflare Tunnel (publico)
+After=network.target nginx.service
+
+[Service]
+User=hibi
+ExecStart=/usr/local/bin/cloudflared tunnel --url http://127.0.0.1:8091 --no-autoupdate
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=NOVALAB Backend
+After=network.target
+
+[Service]
+User=hibi
+WorkingDirectory=/opt/novalab/backend
+EnvironmentFile=/opt/novalab/backend.env
+ExecStart=/opt/novalab/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8090
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

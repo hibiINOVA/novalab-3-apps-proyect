@@ -23,7 +23,7 @@
 - **Backend único/**: FastAPI + SQLite + Alembic. Business logic, state machines, queue rules, and **all finance formulas** live only there. Routers: auth, catalog, orders, organizations, printers, print_jobs, public, queue, ws.
 - **Seguimiento del cliente/** (planned): SvelteKit static (public, anonymous — only sees own `tracking_token`). **Must not** expose costs/profits/other clients/internal IPs (public tracking app).
 - **Finanzas/** (planned): React + Vite + TS (private). Finance calculations come from backend.
-- **deploy/** (planned): docker-compose, Caddyfile, install.sh.
+- **deploy/**: `web/` (build Flutter de producción para la Pi), `pi/` (units systemd, nginx y auto-deploy.sh). Guía completa: `docs/deploy-raspberry-pi.md`; impresora/cámaras: `docs/setup-raspberry-pi-ender3.md`.
 - **docs/** (planned).
 
 ## Commands (exact)

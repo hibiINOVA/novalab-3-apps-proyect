@@ -1,0 +1,10 @@
+[Unit]
+Description=Revisar commits nuevos de GitHub cada 2 min
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=120
+AccuracySec=15
+
+[Install]
+WantedBy=timers.target
