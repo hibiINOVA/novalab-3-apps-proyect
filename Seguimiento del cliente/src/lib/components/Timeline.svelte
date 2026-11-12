@@ -5,10 +5,11 @@
 
   import { labelFor, ORDER_TIMELINE } from '$lib/types';
 
-  const steps =
-    status === 'cancelled' ? ['confirmed', 'cancelled'] : ORDER_TIMELINE;
+  const steps = $derived(
+    status === 'cancelled' ? ['confirmed', 'cancelled'] : ORDER_TIMELINE,
+  );
 
-  const currentIndex = steps.indexOf(status);
+  const currentIndex = $derived(steps.indexOf(status));
 </script>
 
 <section class="timeline">

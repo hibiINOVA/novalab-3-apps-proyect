@@ -12,7 +12,7 @@
   import Camera from '$lib/components/Camera.svelte';
   import Shipment from '$lib/components/Shipment.svelte';
 
-  const token = data?.token ?? $page.params.token;
+  const token = $derived(data?.token ?? $page.params.token);
 
   let brand = $derived($branding);
   let ord = $derived($order);
@@ -130,7 +130,7 @@
         <span class="est-badge">Entrega estimada: {estLabel}</span>
       {/if}
     </div>
-    <Timeline {ord} {status} />
+    <Timeline order={ord} {status} />
     <Items items={ord.items} />
     <Camera {token} {printing} />
     <Shipment shipment={ord.shipment} />

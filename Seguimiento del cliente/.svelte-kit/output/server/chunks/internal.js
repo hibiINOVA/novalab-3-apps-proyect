@@ -100,10 +100,10 @@ const options = {
   service_worker_options: void 0,
   server_error_boundaries: false,
   templates: {
-    app: ({ head, body, assets, nonce, env }) => '<!DOCTYPE html>\n<html lang="es-MX">\n  <head>\n    <meta charset="utf-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1" />\n    <meta name="robots" content="noindex, nofollow" />\n    <meta name="description" content="Seguimiento de pedido — NOVALAB" />\n    ' + head + "\n  </head>\n  <body>\n    " + body + "\n  </body>\n</html>\n",
+    app: ({ head, body, assets, nonce, env }) => '<!doctype html>\n<html lang="es-MX">\n  <head>\n    <meta charset="utf-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1" />\n    <meta name="robots" content="noindex, nofollow" />\n    <meta name="description" content="Seguimiento de pedido — NOVALAB" />\n    ' + head + "\n  </head>\n  <body>\n    " + body + "\n  </body>\n</html>\n",
     error
   },
-  version_hash: "jogsnk"
+  version_hash: "zotlwz"
 };
 async function get_hooks() {
   let handle;

@@ -73,13 +73,13 @@ function Header($$renderer) {
 function Timeline($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {
     let { order: order2, status = order2?.status } = $$props;
-    const steps = status === "cancelled" ? ["confirmed", "cancelled"] : ORDER_TIMELINE;
-    const currentIndex = steps.indexOf(status);
+    const steps = derived(() => status === "cancelled" ? ["confirmed", "cancelled"] : ORDER_TIMELINE);
+    const currentIndex = derived(() => steps().indexOf(status));
     $$renderer2.push(`<section class="timeline svelte-112n2zp"><h2 class="timeline-title svelte-112n2zp">Estado del pedido</h2> <ol class="timeline-list svelte-112n2zp"><!--[-->`);
-    const each_array = ensure_array_like(steps);
+    const each_array = ensure_array_like(steps());
     for (let i = 0, $$length = each_array.length; i < $$length; i++) {
       let step = each_array[i];
-      $$renderer2.push(`<li class="step svelte-112n2zp"${attr("data-state", i < currentIndex ? "done" : i === currentIndex ? "current" : "upcoming")}><span class="badge svelte-112n2zp">${escape_html(i + 1)}</span> <div class="content svelte-112n2zp"><span class="text svelte-112n2zp">${escape_html(labelFor(step))}</span> <!--[-->`);
+      $$renderer2.push(`<li class="step svelte-112n2zp"${attr("data-state", i < currentIndex() ? "done" : i === currentIndex() ? "current" : "upcoming")}><span class="badge svelte-112n2zp">${escape_html(i + 1)}</span> <div class="content svelte-112n2zp"><span class="text svelte-112n2zp">${escape_html(labelFor(step))}</span> <!--[-->`);
       const each_array_1 = ensure_array_like(order2?.history);
       for (let $$index = 0, $$length2 = each_array_1.length; $$index < $$length2; $$index++) {
         let h = each_array_1[$$index];
@@ -96,8 +96,8 @@ function Timeline($$renderer, $$props) {
         $$renderer2.push(`<!--]-->`);
       }
       $$renderer2.push(`<!--]--></div> `);
-      if (i < steps.length - 1) {
-        $$renderer2.push(`<!--[0--><span${attr_class("connector svelte-112n2zp", void 0, { "hidden": i >= currentIndex && i !== currentIndex - 1 })}></span>`);
+      if (i < steps().length - 1) {
+        $$renderer2.push(`<!--[0--><span${attr_class("connector svelte-112n2zp", void 0, { "hidden": i >= currentIndex() && i !== currentIndex() - 1 })}></span>`);
       } else {
         $$renderer2.push("<!--[-1-->");
       }
@@ -173,7 +173,7 @@ function _page($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {
     var $$store_subs;
     let { data } = $$props;
-    const token = data?.token ?? store_get($$store_subs ??= {}, "$page", page).params.token;
+    const token = derived(() => data?.token ?? store_get($$store_subs ??= {}, "$page", page).params.token);
     let brand = derived(() => store_get($$store_subs ??= {}, "$branding", branding));
     let ord = derived(() => store_get($$store_subs ??= {}, "$order", order));
     let err = derived(() => store_get($$store_subs ??= {}, "$error", error));
@@ -195,7 +195,7 @@ function _page($$renderer, $$props) {
       loadingState(true);
       err(null);
       try {
-        const o = await publicApi.getTrack(token);
+        const o = await publicApi.getTrack(token());
         order.set(o);
         ord(o);
       } catch (e) {
@@ -252,11 +252,11 @@ function _page($$renderer, $$props) {
         $$renderer2.push("<!--[-1-->");
       }
       $$renderer2.push(`<!--]--></div> `);
-      Timeline($$renderer2, { ord: ord(), status: status() });
+      Timeline($$renderer2, { order: ord(), status: status() });
       $$renderer2.push(`<!----> `);
       Items($$renderer2, { items: ord().items });
       $$renderer2.push(`<!----> `);
-      Camera($$renderer2, { printing: printing() });
+      Camera($$renderer2, { token: token(), printing: printing() });
       $$renderer2.push(`<!----> `);
       Shipment($$renderer2, { shipment: ord().shipment });
       $$renderer2.push(`<!----></section>`);
