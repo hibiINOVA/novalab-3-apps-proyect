@@ -5,6 +5,7 @@ After=network.target nginx.service
 [Service]
 User=hibi
 ExecStart=/usr/local/bin/cloudflared tunnel --url http://127.0.0.1:8091 --no-autoupdate
+ExecStartPost=/home/hibi/sync-hub-url.sh
 Restart=always
 RestartSec=10
 

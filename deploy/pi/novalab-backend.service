@@ -6,7 +6,7 @@ After=network.target
 User=hibi
 WorkingDirectory=/opt/novalab/backend
 EnvironmentFile=/opt/novalab/backend.env
-ExecStart=/opt/novalab/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8090
+ExecStart=/opt/novalab/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8083
 Restart=on-failure
 RestartSec=5
 
