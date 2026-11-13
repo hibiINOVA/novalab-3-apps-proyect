@@ -55,6 +55,8 @@ Backend env vars use prefix `NOVALAB_` (see `app/config.py`), e.g. `NOVALAB_DB_U
 
 Demo creds (mock + backend seed, password `novalab`): `dueno@novalab.mx` (owner), `operador@novalab.mx` (operator).
 
+Port note (Pi ender3 `192.168.1.84`): 8080/8081 = ustreamer (cámaras), 8090 = `youtube_live.py` — el backend NOVALAB ahí necesita otro puerto (p. ej. 8082); ver `PLAN_LEVANTAR_Y_ELIMINAR_TOTAL.md`.
+
 ## Critical invariants
 
 - Business logic (state machines, queue/missing parts, **all finance formulas**) lives only in `Backend único/`. Frontends present only.
