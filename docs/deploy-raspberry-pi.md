@@ -260,7 +260,7 @@ systemctl is-active novalab-backend novalab-tunnel nginx novalab-deploy.timer
 
 En la app Producción (web): login `dueno@novalab.mx` → debe ver **3 impresoras demo, cola y pedidos NL-1001…** (org seed). Registro un dueño nuevo + organización → listas **vacías** (multi-tenant, org nueva).
 
-> **Gap conocido**: Finanzas llama `/api/finance/*` pero el backend aún no expone ese router (solo `app/services/finance.py`); login funciona pero los datos de financias darán 404 hasta implementarlo.
+> **Router `/api/finance/*` implementado** (F-04..F-11, BE-16/BE-17): resumen, pedidos, tendencia, productos, fallas, gastos CRUD y meta mensual. Para ver el panel con datos, inyecta la demo de finanzas (idempotente): `cd "Backend único" && .venv/bin/python -m app.seed_finance`.
 
 ## 8. Multi-tenant (0005) — qué esperar
 
@@ -278,6 +278,6 @@ En la app Producción (web): login `dueno@novalab.mx` → debe ver **3 impresora
 | Auto-deploy no jala cambios | `journalctl -u novalab-deploy.service`; verifica deploy key (`ssh -i … git@github.com`) y que el timer esté `active` |
 | Errores de encoding en auto-deploy (`Backend \303\272nico`) | Usa `git -c core.quotepath=false diff --name-only` (ya incluido en `auto-deploy.sh`) |
 | Túnel caído / URL cambió | `systemctl restart novalab-tunnel`; `sync-hub-url.sh` (ExecStartPost) renueva `url.txt` solo — revisa `journalctl -u novalab-tunnel` y `~/.novalab-hub-token` |
-| Finanzas carga pero datos vacíos/404 | Gap: aún no existe router `/api/finance/*` en el backend (solo `app/services/finance.py`) |
+| Finanzas carga pero datos vacíos/404 | Revisa `GET /api/finance/summary` con token de dueño (403 = ¿login como operador? BE-17); sin filas = falta `python -m app.seed_finance` |
 | `/finanzas` o `/seguimiento` dan 404 | Falta rsync del build o location de nginx: verifica `/var/www/novalab-{finanzas,seguimiento}/` y `nginx -t` |
 | OctoPrint sin conexión (poller) | Ver `setup-raspberry-pi-ender3.md`; el poller consulta `127.0.0.1:5000` |
