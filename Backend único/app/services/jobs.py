@@ -9,9 +9,29 @@ from app.models import PrintJob
 from app.services.queue import bump_version
 
 
+def register_consumption(db: Session, job: PrintJob) -> None:
+    """BE-04: registra gramos reales (si faltan) y descuenta del spool cargado.
+
+    Idempotente: solo actúa la primera vez que el job termina
+    (`finished_at` aún sin definir).
+    """
+    if job.finished_at is not None:
+        return
+    item = job.item
+    if job.grams_real is None:
+        job.grams_real = item.product.estimated_weight_g or 0.0
+    printer = job.printer
+    spool = printer.loaded_spool if printer is not None else None
+    if spool is not None and job.grams_real:
+        spool.grams_remaining = max(
+            0.0, spool.grams_remaining - float(job.grams_real)
+        )
+
+
 def complete_job(db: Session, job: PrintJob) -> int:
     """BE-04: registra tiempo real y avanza el item (BE-12). Devuelve versión."""
     now = datetime.now(UTC)
+    register_consumption(db, job)
     job.state = "printed"
     job.finished_at = now
     if job.started_at is not None:
@@ -38,6 +58,7 @@ def complete_job(db: Session, job: PrintJob) -> int:
 
 def fail_job(db: Session, job: PrintJob, reason: str) -> int:
     """Falla un job y libera la impresora. Devuelve versión de cola."""
+    register_consumption(db, job)
     job.state = "failed"
     job.finished_at = datetime.now(UTC)
     job.failure_reason = reason

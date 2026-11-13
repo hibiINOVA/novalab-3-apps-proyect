@@ -1,8 +1,10 @@
-"""Tests: login, cola, jobs, pedidos, público, fórmulas, WebSocket."""
+"""Tests: login, cola, jobs, pedidos, público, fórmulas, WebSocket, finanzas."""
+
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from app.db import Base, get_db
@@ -912,3 +914,313 @@ def test_multitenant_queue_version_is_per_org(client):
 
     r = client.get("/api/queue", headers=h_b)
     assert r.json()["version"] == ver_b
+
+
+# --- finanzas (F-04..F-11, §3.8) --------------------------------------------
+def _finance_month():
+    """Mes actual en la tz del negocio (la API filtra por tz local)."""
+    from zoneinfo import ZoneInfo
+    return datetime.now(UTC).astimezone(
+        ZoneInfo("America/Mexico_City")).strftime("%Y-%m")
+
+
+def _prev_month(month: str) -> str:
+    year, mon = int(month[:4]), int(month[5:])
+    return f"{year - 1}-12" if mon == 1 else f"{year}-{mon - 1:02d}"
+
+
+def test_finance_requires_owner(client):
+    """BE-17: el operador no ve finanzas; sin token → 401."""
+    h = _auth(client, email="operador@novalab.mx")
+    month = _finance_month()
+    for path in (f"/api/finance/summary?month={month}",
+                 f"/api/finance/orders?month={month}",
+                 "/api/finance/trend",
+                 "/api/finance/products",
+                 f"/api/finance/failures?month={month}",
+                 f"/api/finance/expenses?month={month}",
+                 f"/api/finance/goal?month={month}"):
+        r = client.get(path, headers=h)
+        assert r.status_code == 403, path
+        assert r.json()["code"] == "forbidden"
+    r = client.post("/api/finance/expenses", headers=h, json={
+        "date": "2026-11-13", "category": "otro", "amount": 10.0})
+    assert r.status_code == 403
+    assert client.get(
+        f"/api/finance/summary?month={month}").status_code == 401
+
+
+def test_finance_summary_matches_orders_and_formulas(client):
+    """Resumen = pedidos + gastos sin pedido + fallas; fórmulas §3.8."""
+    h = _auth(client)
+    month = _finance_month()
+    s = client.get(f"/api/finance/summary?month={month}", headers=h).json()
+    orders = client.get(
+        f"/api/finance/orders?month={month}", headers=h).json()
+    assert s["month"] == month
+    assert s["orders_count"] == len(orders)
+    assert s["income"] == pytest.approx(sum(o["income"] for o in orders))
+    order_costs = sum(sum(o["costs"].values()) for o in orders)
+    expenses = client.get(
+        f"/api/finance/expenses?month={month}", headers=h).json()
+    unlinked = sum(e["amount"] for e in expenses if e["order_id"] is None)
+    failures = client.get(
+        f"/api/finance/failures?month={month}", headers=h).json()
+    fail_cost = sum(f["money_lost"] for f in failures)
+    assert s["costs"] == pytest.approx(order_costs + unlinked + fail_cost)
+    assert s["profit"] == pytest.approx(s["income"] - s["costs"])
+    if s["income"]:
+        assert s["margin"] == pytest.approx(s["profit"] / s["income"])
+    else:
+        assert s["margin"] == 0.0
+    # variación vs mes anterior (misma fórmula por API)
+    s_prev = client.get(
+        f"/api/finance/summary?month={_prev_month(month)}",
+        headers=h).json()
+    assert s["previous_month_profit"] == pytest.approx(s_prev["profit"])
+    if s_prev["profit"] == 0:
+        assert s["variation_pct"] == 0.0
+    else:
+        assert s["variation_pct"] == pytest.approx(
+            (s["profit"] - s_prev["profit"]) / s_prev["profit"])
+    # meta (F-04)
+    assert s["goal_reached"] == pytest.approx(s["profit"])
+    assert s["goal_missing"] == pytest.approx(
+        max(0.0, s["goal"] - s["profit"]))
+    # mes inválido
+    assert client.get(
+        "/api/finance/summary?month=2026-13",
+        headers=h).status_code == 400
+
+
+def test_finance_orders_filters(client):
+    """Filtros mes/estado/q del listado financiero (F-05)."""
+    h = _auth(client)
+    month = _finance_month()
+    all_orders = client.get(
+        f"/api/finance/orders?month={month}", headers=h).json()
+    assert all_orders
+    folio = all_orders[0]["folio"]
+    r = client.get(
+        f"/api/finance/orders?month={month}&q={folio}", headers=h).json()
+    assert [o["folio"] for o in r] == [folio]
+    r = client.get(
+        f"/api/finance/orders?month={month}&status=confirmed",
+        headers=h).json()
+    assert r and all(o["status"] == "confirmed" for o in r)
+    # cada fila tiene desglose completo y coherencia ingreso/ganancia
+    for o in all_orders:
+        assert set(o["costs"]) == {"material", "light", "packaging",
+                                   "shipping", "commissions", "other"}
+        assert o["profit"] == pytest.approx(o["income"] - sum(o["costs"].values()))
+    assert client.get(
+        "/api/finance/orders?month=2020-01", headers=h).json() == []
+
+
+def test_finance_expenses_crud(client):
+    """CRUD de gastos (F-09): crear, listar, actualizar, borrar, validar."""
+    h = _auth(client)
+    month = _finance_month()
+    today = datetime.now(UTC).date().isoformat()
+    r = client.post("/api/finance/expenses", headers=h, json={
+        "date": today, "category": "empaque", "amount": 150.0})
+    assert r.status_code == 201, r.text
+    exp = r.json()
+    assert exp["category"] == "empaque"
+    assert exp["order_folio"] is None
+    r = client.get(f"/api/finance/expenses?month={month}", headers=h)
+    assert any(e["id"] == exp["id"] for e in r.json())
+    r = client.patch(f"/api/finance/expenses/{exp['id']}", headers=h,
+                     json={"amount": 200.0, "category": "envio"})
+    assert r.status_code == 200
+    assert r.json()["amount"] == 200.0
+    assert r.json()["category"] == "envio"
+    # validaciones
+    r = client.post("/api/finance/expenses", headers=h, json={
+        "date": today, "category": "empaque", "amount": -5})
+    assert r.status_code == 422
+    r = client.post("/api/finance/expenses", headers=h, json={
+        "date": today, "category": "inventada", "amount": 10})
+    assert r.status_code == 422
+    r = client.post("/api/finance/expenses", headers=h, json={
+        "date": today, "category": "otro", "amount": 10,
+        "order_id": 999999})
+    assert r.status_code == 404
+    # borrado y 404 posterior
+    assert client.delete(
+        f"/api/finance/expenses/{exp['id']}", headers=h).status_code == 204
+    r = client.get(f"/api/finance/expenses?month={month}", headers=h)
+    assert all(e["id"] != exp["id"] for e in r.json())
+    assert client.delete(
+        f"/api/finance/expenses/{exp['id']}", headers=h).status_code == 404
+
+
+def test_finance_goal_get_patch(client):
+    """Meta por mes y tarifa de luz (F-10), con restauración al final."""
+    h = _auth(client)
+    month = _finance_month()
+    r = client.get(f"/api/finance/goal?month={month}", headers=h)
+    assert r.status_code == 200
+    goal = r.json()
+    assert goal["month"] == month
+    assert goal["tariff_kwh"] > 0
+    original_amount = goal["goal_amount"]
+    original_tariff = goal["tariff_kwh"]
+    # la meta entra al resumen
+    r = client.patch(f"/api/finance/goal?month={month}", headers=h,
+                     json={"goal_amount": 77777.0})
+    assert r.status_code == 200
+    assert r.json()["goal_amount"] == 77777.0
+    s = client.get(f"/api/finance/summary?month={month}", headers=h).json()
+    assert s["goal"] == 77777.0
+    assert s["goal_missing"] == pytest.approx(
+        max(0.0, 77777.0 - s["profit"]))
+    # tarifa
+    r = client.patch(f"/api/finance/goal?month={month}", headers=h,
+                     json={"tariff_kwh": 6.5})
+    assert r.json()["tariff_kwh"] == 6.5
+    assert client.get(
+        f"/api/finance/goal?month=2026-13", headers=h).status_code == 400
+    # restaurar para no afectar el resto de la suite
+    client.patch(f"/api/finance/goal?month={month}", headers=h,
+                 json={"goal_amount": original_amount,
+                       "tariff_kwh": original_tariff})
+
+
+def test_finance_failures_and_trend(client):
+    """Costo de fallas (F-08) y tendencia de 12 meses (F-06)."""
+    h = _auth(client)
+    month = _finance_month()
+    r = client.get(f"/api/finance/failures?month={month}", headers=h)
+    assert r.status_code == 200
+    failures = r.json()
+    # el seed tiene exactamente un job fallido en el mes actual
+    assert len(failures) == 1
+    f = failures[0]
+    assert f["month"] == month
+    assert f["failed_jobs_count"] == 1
+    assert f["grams_lost"] == pytest.approx(60.0)
+    # dinero = material + luz del job fallido (§3.8): spool Negro $400/kg
+    tariff = client.get(
+        f"/api/finance/goal?month={month}", headers=h).json()["tariff_kwh"]
+    expected = 60.0 * 400.0 / 1000.0 + (75 / 60.0) * 0.15 * tariff
+    assert f["money_lost"] == pytest.approx(expected)
+
+    r = client.get("/api/finance/trend", headers=h)
+    assert r.status_code == 200
+    points = r.json()
+    assert len(points) == 12
+    assert points[-1]["month"] == month
+    for p in points:
+        assert p["profit"] == pytest.approx(p["income"] - p["costs"])
+    s = client.get(f"/api/finance/summary?month={month}", headers=h).json()
+    assert points[-1]["income"] == pytest.approx(s["income"])
+    assert points[-1]["costs"] == pytest.approx(s["costs"])
+
+
+def test_finance_products(client):
+    """Rentabilidad por producto (F-07) con coherencia de fórmulas."""
+    h = _auth(client)
+    r = client.get("/api/finance/products", headers=h)
+    assert r.status_code == 200
+    products = r.json()
+    assert products
+    names = {p["product_name"] for p in products}
+    assert "Portavasos hexagonal" in names
+    for p in products:
+        assert p["orders_count"] >= 1
+        assert p["profit"] == pytest.approx(p["income"] - p["costs"])
+        if p["income"]:
+            assert p["margin"] == pytest.approx(p["profit"] / p["income"])
+        else:
+            assert p["margin"] == 0.0
+
+
+def test_finance_order_breakdown_formula(client):
+    """Material/luz de un pedido = fórmulas §3.8 sobre sus jobs impresos."""
+    h = _auth(client)
+    month = _finance_month()
+
+    engine = create_engine("sqlite:///./test_novalab.db",
+                           connect_args={"check_same_thread": False})
+    TestingSession = sessionmaker(bind=engine, autoflush=False,
+                                  expire_on_commit=False)
+    db = TestingSession()
+    try:
+        org_id = db.scalar(select(Organization.id).where(
+            Organization.code == "ORG-NOVA-101"))
+        printer_id, cpg = db.execute(
+            select(Printer.id, Spool.cost_per_kg)
+            .join(Spool, Printer.loaded_spool_id == Spool.id)
+            .where(Printer.organization_id == org_id)
+        ).first()
+        product = Product(organization_id=org_id,
+                          name="Producto Fin Fórmula",
+                          estimated_weight_g=100, estimated_minutes=60,
+                          base_price=500.0)
+        db.add(product)
+        db.flush()
+        order = Order(organization_id=org_id, folio="NL-FIN1",
+                      total=500.0, status="confirmed",
+                      tracking_token="tok-finance-formula-1",
+                      created_at=datetime.now(UTC))
+        db.add(order)
+        db.flush()
+        item = OrderItem(organization_id=org_id, order_id=order.id,
+                         product_id=product.id, quantity=1,
+                         printed_quantity=1, state="printed",
+                         printer_id=printer_id, position=0,
+                         estimated_minutes=60)
+        db.add(item)
+        db.flush()
+        db.add(PrintJob(organization_id=org_id, item_id=item.id,
+                        printer_id=printer_id, state="printed",
+                        started_at=datetime.now(UTC) - timedelta(minutes=60),
+                        finished_at=datetime.now(UTC),
+                        grams_real=100.0, minutes_real=60))
+        db.commit()
+    finally:
+        db.close()
+
+    r = client.get(f"/api/finance/orders?month={month}&q=NL-FIN1",
+                   headers=h).json()
+    assert len(r) == 1
+    row = r[0]
+    tariff = client.get(
+        f"/api/finance/goal?month={month}", headers=h).json()["tariff_kwh"]
+    assert row["costs"]["material"] == pytest.approx(100.0 * cpg / 1000.0)
+    assert row["costs"]["light"] == pytest.approx((60 / 60.0) * 0.15 * tariff)
+    assert row["income"] == 500.0
+    costs_total = sum(row["costs"].values())
+    assert row["profit"] == pytest.approx(500.0 - costs_total)
+    assert row["margin"] == pytest.approx(row["profit"] / 500.0)
+
+
+def test_finance_multitenant_isolation(client):
+    """La org nueva ve finanzas vacías y sus propias metas (aislamiento)."""
+    h_b, _ = _make_org(client, "Taller Finanzas",
+                       "finanzas-isla@ejemplo.mx")
+    month = _finance_month()
+    s = client.get(f"/api/finance/summary?month={month}", headers=h_b).json()
+    assert s["orders_count"] == 0
+    assert s["income"] == 0.0
+    assert s["costs"] == 0.0
+    assert s["profit"] == 0.0
+    assert client.get(
+        f"/api/finance/orders?month={month}", headers=h_b).json() == []
+    assert client.get(
+        f"/api/finance/expenses?month={month}", headers=h_b).json() == []
+    assert client.get("/api/finance/products", headers=h_b).json() == []
+    assert client.get(
+        f"/api/finance/failures?month={month}", headers=h_b).json() == []
+    # la meta es propia de la org
+    r = client.patch(f"/api/finance/goal?month={month}", headers=h_b,
+                     json={"goal_amount": 1000.0})
+    assert r.json()["goal_amount"] == 1000.0
+    s_b = client.get(
+        f"/api/finance/summary?month={month}", headers=h_b).json()
+    assert s_b["goal"] == 1000.0
+    s_a = client.get(
+        f"/api/finance/summary?month={month}",
+        headers=_auth(client)).json()
+    assert s_a["goal"] != 1000.0

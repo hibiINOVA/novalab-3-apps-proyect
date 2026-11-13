@@ -319,3 +319,40 @@ class Setting(Base):
 
     key: Mapped[str] = mapped_column(String(60), primary_key=True)
     value: Mapped[str] = mapped_column(String(200))
+
+
+class Expense(Base):
+    """Gasto del negocio (F-09): fecha, categoría, monto y pedido opcional."""
+
+    __tablename__ = "expenses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date, index=True)
+    category: Mapped[str] = mapped_column(String(30))  # luz|empaque|envio|...
+    amount: Mapped[float] = mapped_column(Float)
+    order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    order: Mapped[Order | None] = relationship("Order")
+
+
+class MonthlyGoal(Base):
+    """Meta de ganancia por mes y organización (F-04/F-10)."""
+
+    __tablename__ = "goals"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "month", name="uq_goals_org_month"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), index=True
+    )
+    month: Mapped[str] = mapped_column(String(7))  # YYYY-MM
+    goal_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

@@ -14,6 +14,7 @@ from app.db import Base, get_session_factory, get_engine, init_db
 from app.routers import (
     auth,
     catalog,
+    finance,
     orders,
     organizations,
     print_jobs,
@@ -105,4 +106,5 @@ app.include_router(queue.router)
 app.include_router(print_jobs.router)
 app.include_router(orders.router)
 app.include_router(catalog.router)
+app.include_router(finance.router)
 app.include_router(ws.router)

@@ -461,3 +461,116 @@ class StatusEvent(BaseModel):
     entity_id: int | None = None
     payload: dict[str, Any] | None = None
     occurred_at: datetime
+
+
+# --- finanzas (F-04..F-10, §3.8) -------------------------------------------
+class FinanceCategory(str, Enum):
+    luz = "luz"
+    empaque = "empaque"
+    envio = "envio"
+    comisiones = "comisiones"
+    mantenimiento = "mantenimiento"
+    otro = "otro"
+
+
+class FinanceOrderCostBreakdown(BaseModel):
+    material: float
+    light: float
+    packaging: float
+    shipping: float
+    commissions: float
+    other: float
+
+
+class FinanceOrder(BaseModel):
+    id: int
+    folio: str
+    customer_name: str
+    status: str
+    total: float
+    income: float
+    costs: FinanceOrderCostBreakdown
+    profit: float
+    margin: float
+    created_at: datetime
+    promised_date: date | None = None
+
+
+class FinanceSummary(BaseModel):
+    month: str  # YYYY-MM
+    orders_count: int
+    income: float
+    costs: float
+    profit: float
+    margin: float
+    previous_month_profit: float
+    variation_pct: float
+    goal: float
+    goal_reached: float
+    goal_missing: float
+
+
+class FinanceTrendPoint(BaseModel):
+    month: str
+    income: float
+    costs: float
+    profit: float
+
+
+class FinanceProduct(BaseModel):
+    product_id: int
+    product_name: str
+    orders_count: int
+    income: float
+    costs: float
+    profit: float
+    margin: float
+
+
+class FinanceFailure(BaseModel):
+    month: str
+    failed_jobs_count: int
+    grams_lost: float
+    money_lost: float
+
+
+class Expense(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    date: date
+    category: FinanceCategory
+    amount: float
+    order_id: int | None = None
+    order_folio: str | None = None
+    created_at: datetime
+
+
+class ExpenseCreateRequest(BaseModel):
+    date: date
+    category: FinanceCategory
+    amount: float = Field(gt=0)
+    order_id: int | None = None
+
+
+# El campo se llama `date` y PEP 526 evalúa el default antes que la anotación
+# (sombrearía `date` con None en el cuerpo de la clase); se precalcula el tipo.
+OptionalDate = date | None
+
+
+class ExpenseUpdateRequest(BaseModel):
+    date: OptionalDate = None
+    category: FinanceCategory | None = None
+    amount: float | None = Field(default=None, gt=0)
+    order_id: int | None = None
+
+
+class MonthlyGoal(BaseModel):
+    month: str  # YYYY-MM
+    goal_amount: float
+    tariff_kwh: float
+
+
+class MonthlyGoalUpdate(BaseModel):
+    goal_amount: float | None = Field(default=None, ge=0)
+    tariff_kwh: float | None = Field(default=None, ge=0)
