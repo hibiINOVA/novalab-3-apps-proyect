@@ -27,6 +27,7 @@ tags:
   - name: orders
   - name: customers
   - name: products
+  - name: finance
 
 paths:
   /api/auth/login:
@@ -1068,6 +1069,280 @@ paths:
                 $ref: '#/components/schemas/Product'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /api/finance/summary:
+    get:
+      tags: [finance]
+      operationId: financeSummary
+      summary: Resumen financiero del mes (ingresos, costos, ganancia y meta, F-04)
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+      responses:
+        '200':
+          description: Resumen del mes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinanceSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/finance/orders:
+    get:
+      tags: [finance]
+      operationId: listFinanceOrders
+      summary: Pedidos con desglose de costos y ganancia (F-05)
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          description: Búsqueda por folio o nombre de cliente
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pedidos del periodo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FinanceOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/finance/trend:
+    get:
+      tags: [finance]
+      operationId: financeTrend
+      summary: Ingresos, costos y ganancia de los últimos 12 meses (F-06)
+      responses:
+        '200':
+          description: Puntos mensuales en orden ascendente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FinanceTrendPoint'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/finance/products:
+    get:
+      tags: [finance]
+      operationId: financeProducts
+      summary: Rentabilidad por producto, histórico de la organización (F-07)
+      responses:
+        '200':
+          description: Productos ordenados por ganancia
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FinanceProduct'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/finance/failures:
+    get:
+      tags: [finance]
+      operationId: financeFailures
+      summary: Costo de fallas del mes (gramos y dinero perdidos, F-08)
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+      responses:
+        '200':
+          description: Fallas del mes (vacío si no hay)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FinanceFailure'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/finance/expenses:
+    get:
+      tags: [finance]
+      operationId: listExpenses
+      summary: Gastos del negocio (F-09)
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+      responses:
+        '200':
+          description: Gastos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Expense'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [finance]
+      operationId: createExpense
+      summary: Registra un gasto (F-09)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseCreateRequest'
+      responses:
+        '201':
+          description: Gasto creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Pedido no encontrado
+
+  /api/finance/expenses/{expenseId}:
+    patch:
+      tags: [finance]
+      operationId: updateExpense
+      summary: Actualiza un gasto (F-09)
+      parameters:
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseUpdateRequest'
+      responses:
+        '200':
+          description: Gasto actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Gasto no encontrado
+    delete:
+      tags: [finance]
+      operationId: deleteExpense
+      summary: Elimina un gasto (F-09)
+      parameters:
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Gasto eliminado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Gasto no encontrado
+
+  /api/finance/goal:
+    get:
+      tags: [finance]
+      operationId: financeGoal
+      summary: Meta de ganancia del mes y tarifa de luz vigentes (F-10)
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+      responses:
+        '200':
+          description: Meta y tarifa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyGoal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      tags: [finance]
+      operationId: updateFinanceGoal
+      summary: Actualiza la meta del mes y/o la tarifa de luz (F-10)
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MonthlyGoalUpdate'
+      responses:
+        '200':
+          description: Meta y tarifa actualizadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyGoal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
 # Canal de tiempo real (WebSocket). OpenAPI no describe WebSocket de forma nativa;
 # se documenta mediante extensión para los generadores de clientes.
@@ -2132,6 +2407,217 @@ components:
         occurred_at:
           type: string
           format: date-time
+
+    FinanceCategory:
+      type: string
+      enum: [luz, empaque, envio, comisiones, mantenimiento, otro]
+
+    FinanceOrderCostBreakdown:
+      type: object
+      required: [material, light, packaging, shipping, commissions, other]
+      properties:
+        material:
+          type: number
+        light:
+          type: number
+        packaging:
+          type: number
+        shipping:
+          type: number
+        commissions:
+          type: number
+        other:
+          type: number
+
+    FinanceOrder:
+      type: object
+      required: [id, folio, customer_name, status, total, income, costs, profit, margin, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        folio:
+          type: string
+        customer_name:
+          type: string
+        status:
+          type: string
+        total:
+          type: number
+        income:
+          type: number
+          description: Facturado (0 si el pedido está cancelado)
+        costs:
+          $ref: '#/components/schemas/FinanceOrderCostBreakdown'
+        profit:
+          type: number
+        margin:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+        promised_date:
+          type: string
+          format: date
+          nullable: true
+
+    FinanceSummary:
+      type: object
+      required: [month, orders_count, income, costs, profit, margin, previous_month_profit, variation_pct, goal, goal_reached, goal_missing]
+      properties:
+        month:
+          type: string
+          description: YYYY-MM
+        orders_count:
+          type: integer
+        income:
+          type: number
+        costs:
+          type: number
+          description: Costos de pedidos del mes + gastos sin pedido + costo de fallas
+        profit:
+          type: number
+        margin:
+          type: number
+        previous_month_profit:
+          type: number
+        variation_pct:
+          type: number
+        goal:
+          type: number
+        goal_reached:
+          type: number
+          description: Ganancia del mes alcanzada contra la meta
+        goal_missing:
+          type: number
+
+    FinanceTrendPoint:
+      type: object
+      required: [month, income, costs, profit]
+      properties:
+        month:
+          type: string
+        income:
+          type: number
+        costs:
+          type: number
+        profit:
+          type: number
+
+    FinanceProduct:
+      type: object
+      required: [product_id, product_name, orders_count, income, costs, profit, margin]
+      properties:
+        product_id:
+          type: integer
+          format: int64
+        product_name:
+          type: string
+        orders_count:
+          type: integer
+        income:
+          type: number
+        costs:
+          type: number
+        profit:
+          type: number
+        margin:
+          type: number
+
+    FinanceFailure:
+      type: object
+      required: [month, failed_jobs_count, grams_lost, money_lost]
+      properties:
+        month:
+          type: string
+        failed_jobs_count:
+          type: integer
+        grams_lost:
+          type: number
+        money_lost:
+          type: number
+          description: material + luz de los jobs fallidos (§3.8)
+
+    Expense:
+      type: object
+      required: [id, date, category, amount, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        date:
+          type: string
+          format: date
+        category:
+          $ref: '#/components/schemas/FinanceCategory'
+        amount:
+          type: number
+        order_id:
+          type: integer
+          format: int64
+          nullable: true
+        order_folio:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ExpenseCreateRequest:
+      type: object
+      required: [date, category, amount]
+      properties:
+        date:
+          type: string
+          format: date
+        category:
+          $ref: '#/components/schemas/FinanceCategory'
+        amount:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+        order_id:
+          type: integer
+          format: int64
+          nullable: true
+
+    ExpenseUpdateRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        category:
+          $ref: '#/components/schemas/FinanceCategory'
+        amount:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+        order_id:
+          type: integer
+          format: int64
+          nullable: true
+
+    MonthlyGoal:
+      type: object
+      required: [month, goal_amount, tariff_kwh]
+      properties:
+        month:
+          type: string
+        goal_amount:
+          type: number
+        tariff_kwh:
+          type: number
+
+    MonthlyGoalUpdate:
+      type: object
+      properties:
+        goal_amount:
+          type: number
+          minimum: 0
+        tariff_kwh:
+          type: number
+          minimum: 0
 
 security:
   - bearerAuth: []

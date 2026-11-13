@@ -19,11 +19,23 @@ import 'package:novalab_api/src/model/customer.dart';
 import 'package:novalab_api/src/model/customer_create_request.dart';
 import 'package:novalab_api/src/model/due_state.dart';
 import 'package:novalab_api/src/model/error.dart';
+import 'package:novalab_api/src/model/expense.dart';
+import 'package:novalab_api/src/model/expense_create_request.dart';
+import 'package:novalab_api/src/model/expense_update_request.dart';
+import 'package:novalab_api/src/model/finance_category.dart';
+import 'package:novalab_api/src/model/finance_failure.dart';
+import 'package:novalab_api/src/model/finance_order.dart';
+import 'package:novalab_api/src/model/finance_order_cost_breakdown.dart';
+import 'package:novalab_api/src/model/finance_product.dart';
+import 'package:novalab_api/src/model/finance_summary.dart';
+import 'package:novalab_api/src/model/finance_trend_point.dart';
 import 'package:novalab_api/src/model/item_state.dart';
 import 'package:novalab_api/src/model/join_organization_request.dart';
 import 'package:novalab_api/src/model/login_request.dart';
 import 'package:novalab_api/src/model/login_response.dart';
 import 'package:novalab_api/src/model/membership_status.dart';
+import 'package:novalab_api/src/model/monthly_goal.dart';
+import 'package:novalab_api/src/model/monthly_goal_update.dart';
 import 'package:novalab_api/src/model/order_create_request.dart';
 import 'package:novalab_api/src/model/order_detail.dart';
 import 'package:novalab_api/src/model/order_item.dart';
@@ -76,11 +88,23 @@ part 'serializers.g.dart';
   CustomerCreateRequest,
   DueState,
   Error,
+  Expense,
+  ExpenseCreateRequest,
+  ExpenseUpdateRequest,
+  FinanceCategory,
+  FinanceFailure,
+  FinanceOrder,
+  FinanceOrderCostBreakdown,
+  FinanceProduct,
+  FinanceSummary,
+  FinanceTrendPoint,
   ItemState,
   JoinOrganizationRequest,
   LoginRequest,
   LoginResponse,
   MembershipStatus,
+  MonthlyGoal,
+  MonthlyGoalUpdate,
   OrderCreateRequest,
   OrderDetail,
   OrderItem,
@@ -132,12 +156,32 @@ Serializers serializers = (_$serializers.toBuilder()
         () => ListBuilder<Printer>(),
       )
       ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(FinanceProduct)]),
+        () => ListBuilder<FinanceProduct>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(FinanceOrder)]),
+        () => ListBuilder<FinanceOrder>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(FinanceTrendPoint)]),
+        () => ListBuilder<FinanceTrendPoint>(),
+      )
+      ..addBuilderFactory(
         const FullType(BuiltList, [FullType(OrganizationMember)]),
         () => ListBuilder<OrganizationMember>(),
       )
       ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(FinanceFailure)]),
+        () => ListBuilder<FinanceFailure>(),
+      )
+      ..addBuilderFactory(
         const FullType(BuiltList, [FullType(OrderSummary)]),
         () => ListBuilder<OrderSummary>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Expense)]),
+        () => ListBuilder<Expense>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(Product)]),

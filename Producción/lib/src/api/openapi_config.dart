@@ -1,4 +1,4 @@
-// Openapi Generator last run: : 2026-11-09T03:21:50.302611
+// Openapi Generator last run: : 2026-11-13T02:04:20.410396
 // Configuración de generación del cliente Dart desde el contrato OpenAPI.
 //
 // El contrato único vive en `packages/api-contract/openapi.yaml` (doc §7).
