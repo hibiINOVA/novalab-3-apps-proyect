@@ -8,7 +8,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_current_org
+from app.deps import get_current_org, get_current_user
 from app.events import hub
 from app.models import (
     Customer,
@@ -17,6 +17,7 @@ from app.models import (
     OrderStatusHistory,
     Organization,
     Product,
+    User,
 )
 from app.schemas import (
     DueState,
@@ -156,6 +157,7 @@ async def create_order(
     body: OrderCreateRequest,
     db: Session = Depends(get_db),
     org: Organization = Depends(get_current_org),
+    user: User = Depends(get_current_user),
 ):
     # Cliente por id o por nombre (crea uno nuevo si hace falta).
     customer = None
@@ -183,6 +185,7 @@ async def create_order(
         folio=random_folio(next_id),
         organization_id=org.id,
         customer_id=customer.id,
+        user_id=user.id,
         promised_date=body.promised_date,
         notes=body.notes,
         total=body.total or 0.0,

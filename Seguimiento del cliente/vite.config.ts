@@ -3,4 +3,12 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [sveltekit()],
+  server: {
+    proxy: {
+      '/api/public': {
+        target: 'http://127.0.0.1:8081',
+        changeOrigin: true,
+      },
+    },
+  },
 });

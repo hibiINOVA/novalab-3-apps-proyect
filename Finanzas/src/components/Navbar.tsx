@@ -17,6 +17,9 @@ export function Navbar({ user, onLogout }: NavbarProps) {
     { to: "/products", label: "Productos" },
     { to: "/failures", label: "Fallas" },
     { to: "/expenses", label: "Gastos" },
+    { to: "/categories", label: "Categorías" },
+    { to: "/user-stats", label: "Usuarios stats" },
+    { to: "/users", label: "Usuarios" },
     { to: "/settings", label: "Ajustes" },
   ];
 

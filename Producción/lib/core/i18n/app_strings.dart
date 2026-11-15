@@ -264,6 +264,26 @@ abstract final class AppStrings {
   static const String orderMustHaveItems =
       'Agrega al menos una pieza para imprimir.';
 
+  // Clientes (CRUD)
+  static const String navCustomers = 'Clientes';
+  static const String customersTitle = 'Clientes';
+  static const String customersEmpty = 'Aún no hay clientes registrados.';
+  static const String customersLoadError =
+      'No se pudieron cargar los clientes.';
+  static const String customerAdd = 'Agregar cliente';
+  static const String customerEdit = 'Editar cliente';
+  static const String customerNameLabel = 'Nombre';
+  static const String customerNameHint = 'Ej. Juan Pérez';
+  static const String customerNameRequired = 'Ingresa el nombre del cliente';
+  static const String customerPhoneLabel = 'Teléfono';
+  static const String customerPhoneHint = 'Ej. 55 1234 5678';
+  static const String customerEmailLabel = 'Correo electrónico';
+  static const String customerEmailHint = 'Ej. juan@correo.com';
+  static const String customerNotesLabel = 'Notas';
+  static const String customerNotesHint = 'Notas internas del cliente';
+  static const String customerCreated = 'Cliente creado.';
+  static const String customerCreateError = 'No se pudo crear el cliente.';
+
   // Generales
   static const String retry = 'Reintentar';
   static const String loading = 'Cargando…';

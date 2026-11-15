@@ -13,9 +13,9 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_current_org
+from app.deps import get_current_org, get_current_user
 from app.events import hub
-from app.models import OrderItem, Organization, PrintJob, Printer
+from app.models import OrderItem, Organization, PrintJob, Printer, User
 from app.schemas import (
     PrintJob as PrintJobSchema,
     PrintJobFailRequest,
@@ -64,6 +64,7 @@ def _get_owned_job(db: Session, org: Organization, job_id: int) -> PrintJob:
              status_code=201)
 async def start(body: PrintJobStartRequest,
                 org: Organization = Depends(get_current_org),
+                user: User = Depends(get_current_user),
                 db: Session = Depends(get_db)):
     """BE-05: solo con confirmación explícita (el frontend ya la pidió)."""
     item = db.get(OrderItem, body.item_id)
@@ -89,6 +90,7 @@ async def start(body: PrintJobStartRequest,
         organization_id=org.id,
         item_id=item.id,
         printer_id=printer.id,
+        user_id=user.id,
         state="printing",
         started_at=datetime.now(UTC),
     )
@@ -197,6 +199,7 @@ async def fail(job_id: int, body: PrintJobFailRequest,
              response_model=PrintJobSchema, status_code=201)
 async def reprint(job_id: int,
                   org: Organization = Depends(get_current_org),
+                  user: User = Depends(get_current_user),
                   db: Session = Depends(get_db)):
     """P-10: reimpresión crea un job nuevo en `queued` (no lo auto-inicia)."""
     old = _get_owned_job(db, org, job_id)
@@ -204,7 +207,8 @@ async def reprint(job_id: int,
     item.state = "queued"
     item.printer_id = old.printer_id
     job = PrintJob(organization_id=org.id, item_id=item.id,
-                   printer_id=old.printer_id, state="queued")
+                   printer_id=old.printer_id, user_id=user.id,
+                   state="queued")
     db.add(job)
     db.flush()
     version = bump_version(db, org.id)

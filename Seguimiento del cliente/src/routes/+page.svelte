@@ -4,6 +4,7 @@
   import { publicApi } from '$lib/api';
   import { error } from '$lib/stores';
   import { goto } from '$app/navigation';
+  import { base } from '$app/paths';
 
   let folio = $state('');
   let phone = $state('');
@@ -24,7 +25,7 @@
         folio,
         phone_last4: last4,
       });
-      goto(`/p/${tracking_token}`);
+      goto(`${base}/p/${tracking_token}`);
     } catch (e) {
       if (e.status === 429) {
         err = 'Demasiados intentos. Espera un momento e inténtalo de nuevo.';

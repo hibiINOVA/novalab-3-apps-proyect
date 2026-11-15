@@ -14,6 +14,8 @@ import type {
   LoginRequest,
   LoginResponse,
   ErrorBody,
+  OrganizationMember,
+  UserStatsResponse,
 } from "$lib/types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -121,6 +123,11 @@ export const financeApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+
+  getMembers: () =>
+    request<OrganizationMember[]>(`${API_BASE}/organizations/members`),
+
+  getUserStats: () => request<UserStatsResponse>(`${API_BASE}/stats/users`),
 };
 
 export { ApiError };

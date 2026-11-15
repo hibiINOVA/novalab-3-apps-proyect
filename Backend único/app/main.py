@@ -21,6 +21,7 @@ from app.routers import (
     printers,
     public,
     queue,
+    stats,
     ws,
 )
 from app.seed import seed_demo
@@ -107,4 +108,5 @@ app.include_router(print_jobs.router)
 app.include_router(orders.router)
 app.include_router(catalog.router)
 app.include_router(finance.router)
+app.include_router(stats.router)
 app.include_router(ws.router)

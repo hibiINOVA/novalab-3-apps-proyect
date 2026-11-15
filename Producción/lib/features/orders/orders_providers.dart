@@ -43,6 +43,19 @@ final customerByIdProvider = FutureProvider.family<Customer?, int>((
   }
 });
 
+/// Registro de un nuevo cliente (CRUD de clientes).
+final customerCreateProvider =
+    FutureProvider.family<Customer, CustomerCreateRequest>((
+      ref,
+      request,
+    ) async {
+      final response = await ref
+          .read(novalabApiProvider)
+          .getCustomersApi()
+          .createCustomer(customerCreateRequest: request);
+      return response.data!;
+    });
+
 /// Lista de pedidos con auto-actualización por WebSocket.
 final ordersListProvider =
     AsyncNotifierProvider<OrdersListController, List<OrderSummary>>(

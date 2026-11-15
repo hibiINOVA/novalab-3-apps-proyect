@@ -246,6 +246,11 @@ class Order(Base):
 
     customer: Mapped[Customer | None] = relationship("Customer")
 
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    user: Mapped["User | None"] = relationship("User", foreign_keys=[user_id])
+
 
 class OrderItem(Base):
     """Item de pedido / unidad de cola. BE-12: faltante = cantidad − impresa."""
@@ -310,6 +315,11 @@ class PrintJob(Base):
 
     item: Mapped[OrderItem] = relationship("OrderItem")
     printer: Mapped[Printer] = relationship("Printer")
+
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    user: Mapped["User | None"] = relationship("User", foreign_keys=[user_id])
 
 
 class Setting(Base):

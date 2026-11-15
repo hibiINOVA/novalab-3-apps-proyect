@@ -1,6 +1,7 @@
 <svelte:options runes />
 
 <script>
+  import { onMount, onDestroy } from 'svelte';
   let { data } = $props();
   import { page } from '$app/stores';
   import { publicApi, ApiError } from '$lib/api';
@@ -37,23 +38,23 @@
   $effect(() => applyTheme());
 
   async function loadOrder() {
-    loadingState = true;
-    err = null;
+    loading.set(true);
+    error.set(null);
     try {
       const o = await publicApi.getTrack(token);
       order.set(o);
-      ord = o;
     } catch (e) {
       if (e instanceof ApiError) {
-        err =
+        error.set(
           e.status === 404
             ? 'No encontramos ese pedido. Verifica que el enlace sea correcto.'
-            : 'No se pudo cargar el pedido. Inténtalo de nuevo.';
+            : 'No se pudo cargar el pedido. Inténtalo de nuevo.',
+        );
       } else {
-        err = 'No se pudo cargar el pedido. Inténtalo de nuevo.';
+        error.set('No se pudo cargar el pedido. Inténtalo de nuevo.');
       }
     } finally {
-      loadingState = false;
+      loading.set(false);
     }
   }
 
@@ -101,7 +102,7 @@
   );
 </script>
 
-{@render Header()}
+<Header />
 
 {#if loadingState}
   <section class="page">

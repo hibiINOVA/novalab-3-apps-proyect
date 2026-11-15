@@ -42,6 +42,10 @@ node_modules/
 dist/
 .vite/
 
+# --- SvelteKit build artifacts (no commitear) ---
+.svelte-kit/
+build/
+
 # --- Datos y despliegue locales ---
 /data/
 *.sqlite

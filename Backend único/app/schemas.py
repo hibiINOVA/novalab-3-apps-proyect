@@ -574,3 +574,26 @@ class MonthlyGoal(BaseModel):
 class MonthlyGoalUpdate(BaseModel):
     goal_amount: float | None = Field(default=None, ge=0)
     tariff_kwh: float | None = Field(default=None, ge=0)
+
+
+# --- estadísticas por usuario -----------------------------------------------
+class UserStats(BaseModel):
+    """Métricas de un usuario en la organización (órdenes, jobs, dinero)."""
+    user_id: int
+    user_name: str
+    user_email: str
+    role: Role
+    orders_count: int
+    income: float
+    costs: float
+    profit: float
+    margin: float
+    jobs_started: int
+    jobs_completed: int
+    jobs_failed: int
+    minutes_printed: int
+    grams_printed: float
+
+
+class UserStatsResponse(BaseModel):
+    users: list[UserStats]

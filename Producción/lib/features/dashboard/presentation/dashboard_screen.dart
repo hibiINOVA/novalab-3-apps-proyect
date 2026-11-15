@@ -6,6 +6,7 @@ import '../../../core/branding/branding_provider.dart';
 import '../../../core/i18n/app_strings.dart';
 import '../../../core/theme/design_tokens.dart';
 import '../../auth/auth_providers.dart';
+import '../../orders/presentation/customers_tab.dart';
 import '../../organization/organization_providers.dart';
 import '../../organization/presentation/edit_organization_dialog.dart';
 import '../../organization/presentation/organization_members_dialog.dart';
@@ -31,7 +32,11 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int _index = 0;
 
-  static const List<Widget> _tabs = <Widget>[PrintersTab(), QueueTab()];
+  static const List<Widget> _tabs = <Widget>[
+    PrintersTab(),
+    QueueTab(),
+    CustomersTab(),
+  ];
   static const List<NavigationRailDestination> _railDestinations =
       <NavigationRailDestination>[
         NavigationRailDestination(
@@ -43,6 +48,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           icon: Icon(Icons.view_kanban_outlined),
           selectedIcon: Icon(Icons.view_kanban),
           label: Text(AppStrings.navQueue),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.people_outlined),
+          selectedIcon: Icon(Icons.people),
+          label: Text(AppStrings.navCustomers),
         ),
       ];
 
@@ -157,6 +167,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   icon: Icon(Icons.view_kanban_outlined),
                   selectedIcon: Icon(Icons.view_kanban),
                   label: AppStrings.navQueue,
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.people_outlined),
+                  selectedIcon: Icon(Icons.people),
+                  label: AppStrings.navCustomers,
                 ),
               ],
             ),

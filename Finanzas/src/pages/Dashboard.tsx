@@ -1,4 +1,4 @@
-import { useSummary, useGoal, useUpdateGoal } from "$lib/hooks";
+import { useSummary, useGoal, useUpdateGoal, useOrders } from "$lib/hooks";
 import { formatCurrency, formatPercent, monthLabel } from "$lib/format";
 import {
   Card,
@@ -18,8 +18,11 @@ export function Dashboard() {
     useSummary(selectedMonth);
   const { data: goal, isPending: savingGoal } = useGoal(selectedMonth);
   const goalMutation = useUpdateGoal();
+  const { data: orders = [], isLoading: loadingOrders } = useOrders({
+    month: selectedMonth,
+  });
 
-  if (loadingSummary) {
+  if (loadingSummary || loadingOrders) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="flex flex-col items-center gap-2 animate-pulse">
@@ -29,6 +32,14 @@ export function Dashboard() {
       </div>
     );
   }
+
+  const avgOrder = summary?.orders_count
+    ? summary.income / summary.orders_count
+    : 0;
+  const cancelled = orders.filter((o) => o.status === "cancelled").length;
+  const delivered = orders.filter(
+    (o) => o.status === "delivered" || o.status === "printed",
+  ).length;
 
   const variation = summary?.variation_pct ?? 0;
   const variationTrend = variation >= 0 ? "up" : "down";
@@ -87,6 +98,53 @@ export function Dashboard() {
                 Margen {formatPercent(summary?.margin ?? 0)}
               </Badge>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Promedio por pedido</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-[#0B132B]">
+              <Money value={avgOrder} />
+            </div>
+            <p className="text-xs text-[#6B7280]">
+              Ingreso promedio por pedido
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Entregados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-[#059669]">{delivered}</div>
+            <p className="text-xs text-[#6B7280]">Completados este mes</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Cancelados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-[#DC2626]">{cancelled}</div>
+            <p className="text-xs text-[#6B7280]">Sin facturación este mes</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Margen medio</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              <Badge variant={summary?.margin! >= 0 ? "success" : "danger"}>
+                {formatPercent(summary?.margin ?? 0)}
+              </Badge>
+            </div>
+            <p className="text-xs text-[#6B7280]">Ganancia / Ingresos</p>
           </CardContent>
         </Card>
       </div>

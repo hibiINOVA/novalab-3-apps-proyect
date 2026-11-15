@@ -8,6 +8,9 @@ import { Products } from "./pages/Products";
 import { Failures } from "./pages/Failures";
 import { Expenses } from "./pages/Expenses";
 import { Settings } from "./pages/Settings";
+import { Users } from "./pages/Users";
+import { Categories } from "./pages/Categories";
+import { UserStats } from "./pages/UserStats";
 import { requireOwner } from "./lib/auth";
 
 const router = createBrowserRouter(
@@ -23,6 +26,9 @@ const router = createBrowserRouter(
         { path: "failures", Component: requireOwner(Failures) },
         { path: "expenses", Component: requireOwner(Expenses) },
         { path: "settings", Component: requireOwner(Settings) },
+        { path: "users", Component: requireOwner(Users) },
+        { path: "categories", Component: requireOwner(Categories) },
+        { path: "user-stats", Component: requireOwner(UserStats) },
       ],
     },
     { path: "/login", Component: Login },

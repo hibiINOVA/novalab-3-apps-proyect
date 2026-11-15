@@ -1,5 +1,9 @@
-import type {LayoutData} from './$types'; import Footer from '$lib/components/Footer.svelte';
-export let data: LayoutData;
+<script lang="ts">
+  import type { LayoutData } from './$types';
+  import Footer from '$lib/components/Footer.svelte';
+
+  export let data: LayoutData;
+</script>
 
 <svelte:head>
   <title>{data.title ?? 'Seguimiento de pedido — NOVALAB'}</title>

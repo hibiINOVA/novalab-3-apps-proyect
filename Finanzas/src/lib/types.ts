@@ -102,6 +102,27 @@ export interface MonthlyGoalUpdate {
   tariff_kwh?: number;
 }
 
+export interface UserStats {
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  role: "owner" | "operator";
+  orders_count: number;
+  income: number;
+  costs: number;
+  profit: number;
+  margin: number;
+  jobs_started: number;
+  jobs_completed: number;
+  jobs_failed: number;
+  minutes_printed: number;
+  grams_printed: number;
+}
+
+export interface UserStatsResponse {
+  users: UserStats[];
+}
+
 export interface Branding {
   business_name: string;
   logo_url?: string | null;
@@ -111,6 +132,24 @@ export interface Branding {
   currency: string;
   timezone: string;
   language: string;
+}
+
+export interface OrganizationMember {
+  id: number;
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  role: "owner" | "operator";
+  status: "pending" | "active" | "rejected";
+  organization_code?: string | null;
+  organization_name?: string | null;
+  created_at?: string | null;
+}
+
+export interface CategoryBreakdown {
+  category: FinanceCategory;
+  amount: number;
+  orders_count: number;
 }
 
 export interface User {

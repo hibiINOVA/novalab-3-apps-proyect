@@ -148,19 +148,21 @@ def seed_demo(db: Session) -> None:
     # --- pedidos demo (folio NL-1001..NL-1005) ---
     today = date.today()
     orders_spec = [
-        # (cliente, producto_idx, qty, printed, state, printer, dias_promesa)
-        (0, 0, 3, 2, "queued", p1.id, 2),
-        (1, 1, 2, 0, "pending", None, 5),
-        (2, 2, 1, 0, "pending", None, 1),
-        (3, 4, 1, 0, "pending", None, 10),
-        (4, 3, 2, 1, "failed", p2.id, -1),  # overdue
+        # (cliente, producto_idx, qty, printed, state, printer, dias_promesa, user_idx)
+        (0, 0, 3, 2, "queued", p1.id, 2, 0),   # owner
+        (1, 1, 2, 0, "pending", None, 5, 1),   # operator
+        (2, 2, 1, 0, "pending", None, 1, 0),   # owner
+        (3, 4, 1, 0, "pending", None, 10, 1),  # operator
+        (4, 3, 2, 1, "failed", p2.id, -1, 0),  # owner
     ]
+    demo_users = [owner, operator]
     for idx, (c_idx, prod_idx, qty, printed, state, printer_id,
-              due_days) in enumerate(orders_spec, start=1001):
+              due_days, u_idx) in enumerate(orders_spec, start=1001):
         order = Order(
             folio=f"NL-{idx}",
             organization_id=org.id,
             customer_id=customers[c_idx].id,
+            user_id=demo_users[u_idx].id,
             promised_date=today + timedelta(days=due_days),
             total=products[prod_idx].base_price * qty,
             tracking_token=new_tracking_token(),
@@ -191,6 +193,7 @@ def seed_demo(db: Session) -> None:
                 organization_id=org.id,
                 item_id=item.id,
                 printer_id=printer_id,
+                user_id=demo_users[u_idx].id,
                 state="printing" if state == "printing" else (
                     "failed" if state == "failed" else "queued"
                 ),

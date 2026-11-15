@@ -6,6 +6,8 @@ import type {
   ExpenseCreateRequest,
   ExpenseUpdateRequest,
   MonthlyGoalUpdate,
+  OrganizationMember,
+  UserStatsResponse,
 } from "$lib/types";
 
 export function useSummary(month: string) {
@@ -110,4 +112,23 @@ export function useUpdateGoal() {
   });
 }
 
-export type { FinanceSummary, FinanceOrder };
+export function useMembers() {
+  return useQuery({
+    queryKey: ["finance", "members"],
+    queryFn: () => financeApi.getMembers(),
+  });
+}
+
+export function useUserStats() {
+  return useQuery({
+    queryKey: ["finance", "userStats"],
+    queryFn: () => financeApi.getUserStats(),
+  });
+}
+
+export type {
+  FinanceSummary,
+  FinanceOrder,
+  OrganizationMember,
+  UserStatsResponse,
+};
