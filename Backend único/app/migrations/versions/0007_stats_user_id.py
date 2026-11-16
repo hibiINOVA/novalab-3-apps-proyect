@@ -23,24 +23,30 @@ depends_on = None
 def upgrade() -> None:
     with op.batch_alter_table("orders") as batch_op:
         batch_op.add_column(
-            sa.Column("user_id", sa.Integer,
-                      sa.ForeignKey("users.id"), nullable=True)
+            sa.Column("user_id", sa.Integer, nullable=True)
+        )
+        batch_op.create_foreign_key(
+            "fk_orders_user_id", "users", ["user_id"], ["id"]
         )
         batch_op.create_index("ix_orders_user_id", ["user_id"])
 
     with op.batch_alter_table("print_jobs") as batch_op:
         batch_op.add_column(
-            sa.Column("user_id", sa.Integer,
-                      sa.ForeignKey("users.id"), nullable=True)
+            sa.Column("user_id", sa.Integer, nullable=True)
+        )
+        batch_op.create_foreign_key(
+            "fk_print_jobs_user_id", "users", ["user_id"], ["id"]
         )
         batch_op.create_index("ix_print_jobs_user_id", ["user_id"])
 
 
 def downgrade() -> None:
     with op.batch_alter_table("print_jobs") as batch_op:
+        batch_op.drop_constraint("fk_print_jobs_user_id", type_="foreignkey")
         batch_op.drop_index("ix_print_jobs_user_id")
         batch_op.drop_column("user_id")
 
     with op.batch_alter_table("orders") as batch_op:
+        batch_op.drop_constraint("fk_orders_user_id", type_="foreignkey")
         batch_op.drop_index("ix_orders_user_id")
         batch_op.drop_column("user_id")
